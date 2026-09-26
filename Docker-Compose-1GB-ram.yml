@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  kho-manager:
+    build: .
+    container_name: kho-manager
+    restart: always
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./shorts:/app/shorts
+      - ./overlay:/app/overlay
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    mem_limit: 700m
+    mem_reservation: 300m
+    deploy:
+      resources:
+        limits:
+          memory: 700M

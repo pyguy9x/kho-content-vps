@@ -228,6 +228,12 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 class LinkIn(BaseModel):
     link: str
     title: Optional[str] = None
+    caption: Optional[str] = None
+    note: Optional[str] = None
+    notes: Optional[str] = None
+    wow_start: Optional[float] = None
+    red_text: Optional[str] = None
+    red: Optional[str] = None
 
 class ThumbReq(BaseModel):
     id: Optional[str] = None
@@ -251,6 +257,10 @@ class LinkUpdate(BaseModel):
     notes: Optional[str] = None
     caption: Optional[str] = None
     done: Optional[bool] = None
+    link: Optional[str] = None
+    wow_start: Optional[float] = None
+    red_text: Optional[str] = None
+    red: Optional[str] = None
 
 class ThumbCustomReq(BaseModel):
     id: Optional[str] = None
@@ -286,9 +296,64 @@ def list_links(status: str = "all", q: str = ""):
 @app.post("/api/links")
 def add_link(payload: LinkIn):
     sb=get_supabase()
-    row={"link":payload.link,"title":payload.title or "", "done":False}
-    res=sb.table("wow_links").insert(row).execute()
-    return {"ok":True,"row":res.data[0] if res.data else row}
+    # Build caption with red markup if red_text provided
+    caption = payload.caption or ""
+    red = payload.red_text or payload.red or ""
+    if red and caption:
+        # if red already in caption inside brackets, keep
+        if f"[{red}]" not in caption and red not in caption:
+            # append red at end if not found
+            caption = f"{caption} [{red}]"
+        elif red in caption and f"[{red}]" not in caption:
+            caption = caption.replace(red, f"[{red}]", 1)
+    elif red and not caption:
+        caption = f"[{red}]"
+    
+    row={
+        "link":payload.link,
+        "title":payload.title or "",
+        "caption":caption,
+        "note":payload.note or payload.notes or "",
+        "notes":payload.note or payload.notes or "",
+        "done":False
+    }
+    # optional columns - try to add if exists
+    if payload.wow_start is not None:
+        row["wow_start"]=payload.wow_start
+    if red:
+        row["red_text"]=red
+        row["red"]=red
+    # filter out None for safety, but keep empty strings
+    try:
+        res=sb.table("wow_links").insert(row).execute()
+        return {"ok":True,"row":res.data[0] if res.data else row}
+    except Exception as e:
+        # fallback if columns don't exist
+        msg=str(e)
+        # remove optional cols if error
+        for k in ["wow_start","red_text","red","notes","note"]:
+            if k in msg.lower() or "column" in msg.lower():
+                row.pop(k, None)
+        # retry with minimal
+        try:
+            # keep only core
+            minimal={"link":payload.link,"title":payload.title or "", "caption":caption, "done":False}
+            if "note" not in str(e).lower():
+                minimal["note"]=payload.note or ""
+            res=sb.table("wow_links").insert(minimal).execute()
+            return {"ok":True,"row":res.data[0] if res.data else minimal, "warning":f"Some columns missing, saved minimal: {e}"}
+        except Exception as e2:
+            raise Exception(f"Insert fail: {e2} original: {e}")
+
+@app.delete("/api/links/{link_id}")
+def delete_link(link_id: str):
+    sb=get_supabase()
+    try:
+        res=sb.table("wow_links").delete().eq("id",link_id).execute()
+        return {"ok":True}
+    except Exception as e:
+        raise HTTPException(500,f"Delete fail: {e}")
+
 
 @app.post("/api/thumbs")
 def get_thumbs(payload: ThumbReq):
@@ -330,7 +395,6 @@ def update_link(link_id: str, payload: LinkUpdate):
         update_data["title"]=payload.title
     if payload.note is not None:
         update_data["note"]=payload.note
-        # also try notes column fallback
         update_data["notes"]=payload.note
     if payload.notes is not None:
         update_data["notes"]=payload.notes
@@ -339,6 +403,16 @@ def update_link(link_id: str, payload: LinkUpdate):
         update_data["caption"]=payload.caption
     if payload.done is not None:
         update_data["done"]=payload.done
+    if payload.link is not None:
+        update_data["link"]=payload.link
+    if payload.wow_start is not None:
+        update_data["wow_start"]=payload.wow_start
+    if payload.red_text is not None:
+        update_data["red_text"]=payload.red_text
+        update_data["red"]=payload.red_text
+    if payload.red is not None:
+        update_data["red_text"]=payload.red
+        update_data["red"]=payload.red
     if not update_data:
         raise HTTPException(400,"Không có gì để update")
     # try update, if column not exist, retry without note/notes

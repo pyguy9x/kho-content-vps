@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Kho Content - Claw Shorts Manager v2</title>
+<title>Kho Content - Claw Shorts Manager v4</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:ui-sans,system-ui,-apple-system,Segoe UI,Roboto; background:#0e0e10;color:#e8e8ea;display:flex;height:100vh;overflow:hidden}
@@ -12,6 +12,8 @@ button:hover{background:#26262c;border-color:#3a3a40}
 button.primary{background:#fff;color:#0e0e10;border-color:#fff;font-weight:700}
 button.primary:hover{background:#e8e8e8}
 button.ghost{background:transparent;border-color:#2a2a2e}
+button.danger{border-color:#4a1a1a;background:#2a1515;color:#ff6b6b}
+button.danger:hover{background:#3a1a1a;border-color:#6a2a2a}
 button.small{padding:5px 10px;font-size:11px}
 button:disabled{opacity:.35;cursor:not-allowed}
 input,textarea{border:1px solid #2a2a2e;background:#16161a;color:#e8e8ea;border-radius:8px;padding:9px 11px;width:100%;font-size:13px}
@@ -51,6 +53,15 @@ input::placeholder,textarea::placeholder{color:#6a6a72}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .col{display:flex;flex-direction:column;gap:8px}
 .note{font-size:11px;color:#7a7a84}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field-label{font-size:11px;color:#9a9aa4;font-weight:600;display:flex;justify-content:space-between}
+.field-row{display:flex;gap:8px;align-items:center}
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal-overlay.show{display:flex}
+.modal{background:#151519;border:1px solid #2a2a2e;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow:auto;padding:20px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-title{font-size:16px;font-weight:700}
 </style>
 </head>
 <body>
@@ -59,7 +70,7 @@ input::placeholder,textarea::placeholder{color:#6a6a72}
     <div><b>KHO LINK</b> <span id="count" style="font-size:12px;opacity:.6"></span></div>
     <button id="btnAdd">+ Thêm link</button>
   </div>
-  <div style="padding:8px 12px"><input id="search" placeholder="Tìm link, title, ghi chú..."/></div>
+  <div style="padding:8px 12px"><input id="search" placeholder="Tìm link, title, ghi chú, red text..."/></div>
   <div class="tabs">
     <button data-filter="all" class="active">Tất cả</button>
     <button data-filter="pending">Chưa làm</button>
@@ -71,12 +82,49 @@ input::placeholder,textarea::placeholder{color:#6a6a72}
   <div style="opacity:.5;padding:40px">Chọn 1 link bên trái để bắt đầu</div>
 </div>
 
+<!-- Modal Thêm Link -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">+ Thêm link mới</div>
+      <button class="small ghost" id="btnCloseModal">✕</button>
+    </div>
+    <div class="col">
+      <div class="field">
+        <div class="field-label"><span>Link cần thêm *</span></div>
+        <input id="modalLink" placeholder="https://www.facebook.com/reel/... hoặc youtube, tiktok..."/>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Caption (vd: Màn trình diễn nhìn thì vui nhưng khúc này hơi thót tim)</span></div>
+        <textarea id="modalCaption" rows="2" placeholder="Nhập caption gốc, chưa cần [đỏ]..."></textarea>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Red text - chữ muốn làm đỏ</span><span class="note">sẽ tự chèn thành [đỏ]</span></div>
+        <input id="modalRed" placeholder="VD: hơi thót tim, không tốt, cháy túi..."/>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Wow moment - giây bắt đầu (duration cố định 5s)</span></div>
+        <div class="field-row"><input id="modalWow" type="number" step="0.1" placeholder="VD: 7.8" style="max-width:140px"/><span class="note">giây, vd 7.8 = bắt đầu từ 7.8s, lấy 5s</span></div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Ghi chú</span></div>
+        <textarea id="modalNote" rows="2" placeholder="VD: khách dặn cắt đoạn 0:05-0:10, gửi trước 9h..."></textarea>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnSubmitAdd" class="primary">Thêm vào kho</button>
+        <button id="btnCancelAdd" class="ghost">Hủy</button>
+        <span class="note" id="addStatus"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 let links=[], filter='all', q='', selected=null, thumbs=[], selectedThumb=null, rawPath=null, rawUrl=null, customThumbs=[]
 
 function parseCaption(text){
   if(!text) return []
-  let m=text.match(/\[(.+?)\]|\{(.+?)\}|\<(.+?)\>|\*\*(.+?)\*\*/)
+  let m=text.match(/\[(.+?)\]|\{(.+?)}|\<(.+?)\>|\*\*(.+?)\*\*/)
   if(m){
     let red=m.slice(1).find(Boolean)
     if(red){
@@ -104,7 +152,7 @@ async function fetchLinks(){
   try{
     let r=await fetch(url); let j=await r.json(); links=j.links||[]
   }catch(e){
-    links=[{id:'1',link:'https://www.facebook.com/reel/1581865910246993',title:'Màn trình diễn nhìn thì vui',done:false,created_at:new Date().toISOString(),caption:'',note:''}]
+    links=[{id:'1',link:'https://www.facebook.com/reel/1581865910246993',title:'Màn trình diễn nhìn thì vui',done:false,created_at:new Date().toISOString(),caption:'Màn trình diễn nhìn thì vui [nhưng khúc này hơi thót tim]',note:'',wow_start:7.8,red_text:'nhưng khúc này hơi thót tim'}]
   }
   renderList()
 }
@@ -115,7 +163,7 @@ function renderList(){
     if(filter==='pending' && l.done) return false
     if(filter==='done' && !l.done) return false
     if(q){
-      let hay=(l.link+' '+(l.title||'')+' '+(l.caption||'')+' '+(l.note||l.notes||'')).toLowerCase()
+      let hay=(l.link+' '+(l.title||'')+' '+(l.caption||'')+' '+(l.note||l.notes||'')+' '+(l.red_text||l.red||'')).toLowerCase()
       if(!hay.includes(q.toLowerCase())) return false
     }
     return true
@@ -129,6 +177,7 @@ function renderList(){
       <div style="flex:1;min-width:0">
         <div class="title">${escapeHtml(l.title||l.caption||l.link)}</div>
         <div class="meta">${escapeHtml(l.link)}</div>
+        <div class="meta">${l.wow_start!=null?`⏱ Wow: ${l.wow_start}s | `:''}${l.red_text||l.red?`🔴 ${escapeHtml(l.red_text||l.red)} | `:''}${escapeHtml((l.caption||'').slice(0,50))}</div>
         ${l.note||l.notes?`<div class="meta" style="color:#ff9">📝 ${escapeHtml((l.note||l.notes).slice(0,40))}</div>`:''}
       </div>`
     div.onclick=()=>selectLink(l.id)
@@ -151,24 +200,45 @@ function renderDetail(){
   let main=document.getElementById('main')
   main.innerHTML=`
     <div class="card">
-      <span class="label">Link info - sửa tiêu đề & ghi chú</span>
+      <span class="label">Link info - sửa từng trường (load lại vẫn giữ)</span>
       <div class="col">
-        <div class="row"><span class="badge ${selected.done?'done':''}">${selected.done?'Đã xong ✓':'Chưa làm'}</span><span class="note">${new Date(selected.created_at).toLocaleString()}</span></div>
-        <div>
-          <div class="note">Link gốc</div>
-          <div class="row"><input id="linkUrl" value="${escapeHtml(selected.link)}" readonly/><button class="small" onclick="copyLink()">Copy</button></div>
+        <div class="row"><span class="badge ${selected.done?'done':''}">${selected.done?'Đã xong ✓':'Chưa làm'}</span><span class="note">${new Date(selected.created_at).toLocaleString()}</span><span class="note">ID: ${selected.id.slice(0,8)}...</span></div>
+        
+        <div class="field">
+          <div class="field-label"><span>Link gốc (sửa được)</span><span class="note" id="linkStatus"></span></div>
+          <div class="field-row"><input id="linkUrl" value="${escapeHtml(selected.link)}"/><button class="small primary" id="btnSaveLink">Lưu link</button></div>
         </div>
-        <div>
-          <div class="note">Tiêu đề (đổi được)</div>
-          <div class="row"><input id="titleInput" value="${escapeHtml(selected.title||'')}" placeholder="Nhập tiêu đề mới..."/><button class="small primary" id="btnSaveTitle">Lưu tiêu đề</button></div>
+
+        <div class="field">
+          <div class="field-label"><span>Tiêu đề</span><span class="note" id="titleStatus"></span></div>
+          <div class="field-row"><input id="titleInput" value="${escapeHtml(selected.title||'')}" placeholder="Nhập tiêu đề..."/><button class="small primary" id="btnSaveTitle">Lưu tiêu đề</button></div>
         </div>
-        <div>
-          <div class="note">Ghi chú / note nội bộ</div>
+
+        <div class="field">
+          <div class="field-label"><span>Caption (có thể chứa [đỏ])</span><span class="note" id="captionFieldStatus"></span></div>
+          <textarea id="captionFieldInput" rows="2" placeholder="VD: Màn trình diễn nhìn thì vui [nhưng khúc này hơi thót tim] xem lại vẫn nổi da gà">${escapeHtml(selected.caption||'')}</textarea>
+          <div class="field-row" style="margin-top:6px"><button class="small primary" id="btnSaveCaptionField">Lưu caption</button><button class="small ghost" id="btnBuildCaptionFromRed">Tạo caption từ red text</button></div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span>Red text - chữ muốn làm đỏ</span><span class="note" id="redStatus"></span></div>
+          <div class="field-row"><input id="redInput" value="${escapeHtml(selected.red_text||selected.red||'')}" placeholder="VD: hơi thót tim"/><button class="small primary" id="btnSaveRed">Lưu red</button><button class="small ghost" id="btnApplyRedToCaption">Chèn vào caption</button></div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span>Wow moment - giây bắt đầu (duration cố định 5s)</span><span class="note" id="wowStatus"></span></div>
+          <div class="field-row"><input id="wowStartField" type="number" step="0.1" value="${selected.wow_start!=null?selected.wow_start:''}" placeholder="VD: 7.8" style="max-width:140px"/><button class="small primary" id="btnSaveWow">Lưu wow</button><span class="note">5s cố định, vd 7.8 = lấy 7.8s -> 12.8s</span></div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span>Ghi chú nội bộ</span><span class="note" id="noteStatus"></span></div>
           <textarea id="noteInput" rows="2" placeholder="VD: khách dặn cắt đoạn 0:05-0:10, gửi trước 9h...">${escapeHtml(selected.note||selected.notes||'')}</textarea>
-          <div class="row" style="margin-top:6px"><button class="small" id="btnSaveNote">Lưu ghi chú</button><span class="note" id="noteStatus"></span></div>
+          <div class="field-row" style="margin-top:6px"><button class="small primary" id="btnSaveNote">Lưu ghi chú</button></div>
         </div>
-        <div class="row">
+
+        <div class="row" style="margin-top:12px">
           <button id="btnToggleDone" class="${selected.done?'ghost':'primary'}">${selected.done?'↩️ Đánh dấu chưa xong':'✅ Đánh dấu đã xong (đã gửi)'}</button>
+          <button id="btnDeleteLink" class="small danger">🗑️ Xóa link</button>
         </div>
       </div>
     </div>
@@ -185,8 +255,8 @@ function renderDetail(){
           </div>
         </div>
         <div class="video-box col">
-          <div class="row"><div style="flex:1"><div class="note">Wow start (giây)</div><input id="wowStart" type="number" step="0.1" value="0"/></div><div style="flex:1"><div class="note">Duration (s)</div><input id="wowDur" type="number" step="0.1" value="5.0"/></div></div>
-          <div class="note">Tip: Xem video gốc, pause đúng lúc wow (vd khúc té, lửa bùng), bấm "Lấy tại giây hiện tại" -> thumb sẽ tự tạo theo wow đó.</div>
+          <div class="row"><div style="flex:1"><div class="note">Wow start (giây)</div><input id="wowStart" type="number" step="0.1" value="${selected.wow_start!=null?selected.wow_start:0}"/></div><div style="flex:1"><div class="note">Duration (s) cố định 5s</div><input id="wowDur" type="number" step="0.1" value="5.0" readonly style="opacity:.6"/></div></div>
+          <div class="note">Tip: Xem video gốc, pause đúng lúc wow (vd khúc té, lửa bùng), bấm "Lấy tại giây hiện tại" -> thumb sẽ tự tạo theo wow đó. Duration cố định 5s.</div>
           <div id="customThumbPreview" style="margin-top:8px"></div>
         </div>
       </div>
@@ -225,15 +295,23 @@ function renderDetail(){
       </div>
       <div style="height:16px"></div>
       <div class="row">
-        <button id="btnRender" class="primary">🎬 Tạo video (overlay + caption)</button>
+        <button id="btnRender" class="primary">🎬 Tạo video (overlay + caption) - 5s cố định</button>
         <span class="note" id="renderStatus"></span>
       </div>
       <div id="videoResult" style="margin-top:12px"></div>
     </div>
   `
+  // bind events
+  document.getElementById('btnSaveLink').onclick=saveLink
   document.getElementById('btnSaveTitle').onclick=saveTitle
   document.getElementById('btnSaveNote').onclick=saveNote
+  document.getElementById('btnSaveWow').onclick=saveWow
+  document.getElementById('btnSaveRed').onclick=saveRed
+  document.getElementById('btnSaveCaptionField').onclick=saveCaptionField
+  document.getElementById('btnBuildCaptionFromRed').onclick=buildCaptionFromRed
+  document.getElementById('btnApplyRedToCaption').onclick=applyRedToCaption
   document.getElementById('btnToggleDone').onclick=toggleDone
+  document.getElementById('btnDeleteLink').onclick=deleteLink
   document.getElementById('btnThumbs').onclick=loadThumbs
   document.getElementById('btnAI').onclick=aiCaption
   document.getElementById('btnPreview').onclick=updatePreview
@@ -241,22 +319,41 @@ function renderDetail(){
   document.getElementById('btnRefreshPreview').onclick=previewOverlayCaption
   document.getElementById('btnClosePreview').onclick=()=>{ document.getElementById('overlayPreviewBox').style.display='none' }
   document.getElementById('btnRender').onclick=renderVideo
-  // auto update text preview on typing
   document.getElementById('capInput').addEventListener('input',updatePreview)
+  document.getElementById('captionFieldInput').addEventListener('input',()=>{ document.getElementById('capInput').value=document.getElementById('captionFieldInput').value; updatePreview() })
   document.getElementById('titleInput').addEventListener('keydown',e=>{ if(e.key==='Enter') saveTitle() })
+  // sync wow fields
+  let wowField=document.getElementById('wowStartField')
+  let wowMain=document.getElementById('wowStart')
+  if(wowField && wowMain){
+    wowField.addEventListener('input',e=>{ if(wowMain) wowMain.value=e.target.value })
+  }
   updatePreview()
 }
 
-async function copyLink(){ navigator.clipboard.writeText(selected.link) }
+async function saveLink(){
+  let v=document.getElementById('linkUrl').value.trim()
+  if(!v){ alert('Link trống'); return }
+  let btn=document.getElementById('btnSaveLink'); let st=document.getElementById('linkStatus')
+  btn.disabled=true; st.innerText='Đang lưu...'
+  try{
+    let r=await fetch(`/api/links/${selected.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({link:v})})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
+    selected.link=v; let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0) links[idx].link=v
+    st.innerText='Đã lưu ✓'; setTimeout(()=>st.innerText='',2000); renderList()
+  }catch(e){ st.innerText='Lỗi: '+e.message; alert(e.message) }
+  btn.disabled=false
+}
 
 async function saveTitle(){
   let t=document.getElementById('titleInput').value
-  let btn=document.getElementById('btnSaveTitle'); btn.disabled=true; btn.innerText='Đang lưu...'
+  let btn=document.getElementById('btnSaveTitle'); let st=document.getElementById('titleStatus')
+  btn.disabled=true; if(st) st.innerText='Đang lưu...'
   try{
     let r=await fetch(`/api/links/${selected.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t})})
     let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
-    selected.title=t
-    let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0) links[idx].title=t
+    selected.title=t; let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0) links[idx].title=t
+    if(st){ st.innerText='Đã lưu ✓'; setTimeout(()=>st.innerText='',2000) }
     renderList()
   }catch(e){ alert('Lưu tiêu đề lỗi: '+e.message) }
   btn.disabled=false; btn.innerText='Lưu tiêu đề'
@@ -268,11 +365,75 @@ async function saveNote(){
   try{
     let r=await fetch(`/api/links/${selected.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:n, notes:n})})
     let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
-    selected.note=n; selected.notes=n
-    let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0){ links[idx].note=n; links[idx].notes=n }
-    st.innerText='Đã lưu ✓'; setTimeout(()=>st.innerText='',2000)
-    renderList()
+    selected.note=n; selected.notes=n; let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0){ links[idx].note=n; links[idx].notes=n }
+    st.innerText='Đã lưu ✓'; setTimeout(()=>st.innerText='',2000); renderList()
   }catch(e){ st.innerText='Lỗi: '+e.message }
+}
+
+async function saveWow(){
+  let v=parseFloat(document.getElementById('wowStartField').value)
+  if(isNaN(v)){ alert('Nhập số giây wow'); return }
+  let st=document.getElementById('wowStatus'); st.innerText='Đang lưu...'
+  try{
+    let r=await fetch(`/api/links/${selected.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({wow_start:v})})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
+    selected.wow_start=v; let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0) links[idx].wow_start=v
+    let wowMain=document.getElementById('wowStart'); if(wowMain) wowMain.value=v
+    st.innerText='Đã lưu ✓'; setTimeout(()=>st.innerText='',2000); renderList()
+  }catch(e){ st.innerText='Lỗi: '+e.message }
+}
+
+async function saveRed(){
+  let v=document.getElementById('redInput').value.trim()
+  let st=document.getElementById('redStatus'); st.innerText='Đang lưu...'
+  try{
+    let r=await fetch(`/api/links/${selected.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({red_text:v, red:v})})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
+    selected.red_text=v; selected.red=v; let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0){ links[idx].red_text=v; links[idx].red=v }
+    st.innerText='Đã lưu ✓'; setTimeout(()=>st.innerText='',2000); renderList()
+  }catch(e){ st.innerText='Lỗi: '+e.message }
+}
+
+async function saveCaptionField(){
+  let v=document.getElementById('captionFieldInput').value
+  let st=document.getElementById('captionFieldStatus'); st.innerText='Đang lưu...'
+  try{
+    let r=await fetch(`/api/links/${selected.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({caption:v})})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
+    selected.caption=v; let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0) links[idx].caption=v
+    document.getElementById('capInput').value=v; updatePreview()
+    st.innerText='Đã lưu ✓'; setTimeout(()=>st.innerText='',2000); renderList()
+  }catch(e){ st.innerText='Lỗi: '+e.message }
+}
+
+function buildCaptionFromRed(){
+  let cap=document.getElementById('captionFieldInput').value.trim()
+  let red=document.getElementById('redInput').value.trim()
+  if(!red){ alert('Nhập red text trước'); return }
+  if(!cap) cap=red
+  if(cap.includes(red) && !cap.includes(`[${red}]`)){
+    cap=cap.replace(red, `[${red}]`)
+  } else if(!cap.includes(`[${red}]`)){
+    cap=`${cap} [${red}]`
+  }
+  document.getElementById('captionFieldInput').value=cap
+  document.getElementById('capInput').value=cap
+  updatePreview()
+}
+
+function applyRedToCaption(){
+  let cap=document.getElementById('capInput').value
+  let red=document.getElementById('redInput').value.trim()
+  if(!red){ alert('Nhập red text'); return }
+  if(!cap) cap=red
+  if(cap.includes(red) && !cap.includes(`[${red}]`)){
+    cap=cap.replace(red, `[${red}]`)
+  } else if(!cap.includes(`[${red}]`)){
+    cap=`${cap} [${red}]`
+  }
+  document.getElementById('capInput').value=cap
+  document.getElementById('captionFieldInput').value=cap
+  updatePreview()
 }
 
 async function toggleDone(){
@@ -280,13 +441,21 @@ async function toggleDone(){
   try{
     let r=await fetch(`/api/links/${selected.id}/toggle`,{method:'POST'})
     let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
-    selected.done=j.done
-    let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0) links[idx].done=j.done
-    renderDetail()
-    if(rawUrl) setupRawVideo(rawUrl, document.getElementById('wowStart')?.value||0)
-    fetchLinks()
+    selected.done=j.done; let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0) links[idx].done=j.done
+    renderDetail(); if(rawUrl) setupRawVideo(rawUrl, document.getElementById('wowStart')?.value||0); fetchLinks()
   }catch(e){ alert('Toggle lỗi: '+e.message) }
   btn.disabled=false
+}
+
+async function deleteLink(){
+  if(!confirm(`Xóa link này?\n${selected.link}\nKhông khôi phục được!`)) return
+  try{
+    let r=await fetch(`/api/links/${selected.id}`,{method:'DELETE'})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
+    links=links.filter(x=>x.id!==selected.id); selected=null
+    document.getElementById('main').innerHTML='<div style="opacity:.5;padding:40px">Đã xóa. Chọn link khác.</div>'
+    renderList()
+  }catch(e){ alert('Xóa lỗi: '+e.message) }
 }
 
 function updatePreview(){
@@ -306,14 +475,11 @@ async function loadThumbs(){
     let r=await fetch('/api/thumbs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selected.id,link:selected.link})})
     let j=await r.json()
     if(!r.ok) throw new Error(j.detail||'Lỗi tải thumb')
-    rawPath=j.raw_path; rawUrl=j.raw_url
-    thumbs=j.thumbs
+    rawPath=j.raw_path; rawUrl=j.raw_url; thumbs=j.thumbs
     st.innerText=`Duration ${j.duration.toFixed(1)}s - chọn 1 thumb, hoặc xem video bên trên để chọn wow`
-    setupRawVideo(rawUrl, 0, j.duration)
+    setupRawVideo(rawUrl, selected.wow_start||0, j.duration)
     renderThumbs()
-  }catch(e){
-    st.innerText='Lỗi: '+e.message
-  }
+  }catch(e){ st.innerText='Lỗi: '+e.message }
   btn.disabled=false
 }
 
@@ -323,15 +489,18 @@ function setupRawVideo(url, initialStart=0, duration=0){
   card.style.display='block'
   let v=document.getElementById('rawVideo')
   if(!v) return
-  v.src=url
-  v.load()
+  v.src=url; v.load()
   v.onloadedmetadata=()=>{
     document.getElementById('rawTime').innerText=`0.0s / ${v.duration.toFixed(1)}s`
     if(duration===0) duration=v.duration
     let startInput=document.getElementById('wowStart')
-    if(startInput && parseFloat(startInput.value)===0){
-      let suggested=Math.max(0, v.duration-5.3)
+    let wowField=document.getElementById('wowStartField')
+    let suggested = initialStart||Math.max(0, v.duration-5.3)
+    if(startInput && (parseFloat(startInput.value)==0 || isNaN(parseFloat(startInput.value)))){
       startInput.value=suggested.toFixed(1)
+    }
+    if(wowField && (wowField.value=='' || isNaN(parseFloat(wowField.value)))){
+      wowField.value=suggested.toFixed(1)
     }
   }
   v.ontimeupdate=()=>{
@@ -340,18 +509,21 @@ function setupRawVideo(url, initialStart=0, duration=0){
   document.getElementById('btnCaptureTime').onclick=()=>{
     let cur=v.currentTime
     document.getElementById('wowStart').value=cur.toFixed(1)
+    document.getElementById('wowStartField').value=cur.toFixed(1)
     if(!selectedThumb) selectedThumb={start:cur,dur:5}
     else selectedThumb.start=cur
   }
   document.getElementById('btnGenCustomThumb').onclick=genCustomThumb
   document.getElementById('wowStart').addEventListener('input',e=>{
     let val=parseFloat(e.target.value)||0
+    let wf=document.getElementById('wowStartField'); if(wf) wf.value=val
     if(selectedThumb) selectedThumb.start=val
     else selectedThumb={start:val,dur:5}
   })
-  document.getElementById('wowDur').addEventListener('input',e=>{
-    let val=parseFloat(e.target.value)||5
-    if(selectedThumb) selectedThumb.dur=val
+  document.getElementById('wowStartField').addEventListener('input',e=>{
+    let val=parseFloat(e.target.value)||0
+    let ws=document.getElementById('wowStart'); if(ws) ws.value=val
+    if(selectedThumb) selectedThumb.start=val
   })
 }
 
@@ -363,10 +535,7 @@ async function genCustomThumb(){
   try{
     let r=await fetch('/api/thumb_custom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selected.id, raw_path:rawPath, start})})
     let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
-    let t=j.thumb
-    customThumbs.push(t)
-    selectedThumb=t
-    renderThumbs()
+    let t=j.thumb; customThumbs.push(t); selectedThumb=t; renderThumbs()
     document.getElementById('customThumbPreview').innerHTML=`<div class="note">Custom thumb mới:</div><img src="${t.url}" style="width:120px;border-radius:8px;border:2px solid #fff;margin-top:6px"/>`
     status.innerText=`Đã tạo thumb custom tại ${start.toFixed(1)}s - đã chọn luôn để render`
   }catch(e){ status.innerText='Lỗi custom thumb: '+e.message }
@@ -383,10 +552,8 @@ function renderThumbs(){
       selectedThumb=t
       document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('selected'))
       div.classList.add('selected')
-      let ws=document.getElementById('wowStart')
-      if(ws) ws.value=t.start.toFixed(1)
-      let wd=document.getElementById('wowDur')
-      if(wd) wd.value=(t.dur||5).toFixed(1)
+      let ws=document.getElementById('wowStart'); if(ws) ws.value=t.start.toFixed(1)
+      let wf=document.getElementById('wowStartField'); if(wf) wf.value=t.start.toFixed(1)
     }
     box.appendChild(div)
   })
@@ -397,11 +564,11 @@ async function aiCaption(){
   try{
     let r=await fetch('/api/caption/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:selected?.title||'',context:selected?.link||''})})
     let j=await r.json()
-    if(j.text){ document.getElementById('capInput').value=j.text; updatePreview() }
+    if(j.text){ document.getElementById('capInput').value=j.text; document.getElementById('captionFieldInput').value=j.text; updatePreview() }
   }catch(e){
     let fallback=["Tưởng chỉ là tiết mục bình thường [ai ngờ lửa bùng ngay trước mắt] cả sân khấu nín thở","Đang diễn rất bình thường [tới đoạn này ai cũng đứng hình] đúng là không đoán trước được","Màn trình diễn nhìn thì vui [nhưng khúc này hơi thót tim] xem lại vẫn nổi da gà","Cứ tưởng thế nào, chứ [đếm tiền kiểu này] có ngày cháy túi"]
-    document.getElementById('capInput').value=fallback[Math.floor(Math.random()*fallback.length)]
-    updatePreview()
+    let txt=fallback[Math.floor(Math.random()*fallback.length)]
+    document.getElementById('capInput').value=txt; document.getElementById('captionFieldInput').value=txt; updatePreview()
   }
   btn.disabled=false; btn.innerText='Nghĩ hộ 🤖'
 }
@@ -409,64 +576,68 @@ async function aiCaption(){
 async function previewOverlayCaption(){
   let capTxt=document.getElementById('capInput')?.value||''
   if(!capTxt){ alert('Nhập caption trước, nhớ [đỏ]'); return }
-  let start=parseFloat(document.getElementById('wowStart')?.value)||selectedThumb?.start||0
+  let start=parseFloat(document.getElementById('wowStart')?.value)||selectedThumb?.start||selected.wow_start||0
   let status=document.getElementById('overlayPreviewStatus')
   let box=document.getElementById('overlayPreviewBox')
   let img=document.getElementById('overlayPreviewImg')
   if(!box || !img || !status){ console.error('preview elements not found'); return }
-  box.style.display='block'
-  status.innerText=`Đang tạo preview tại ${start.toFixed(1)}s...`
-  img.style.opacity='0.5'
+  box.style.display='block'; status.innerText=`Đang tạo preview tại ${start.toFixed(1)}s...`; img.style.opacity='0.5'
   try{
-    let payload={
-      caption_text:capTxt,
-      raw_path:rawPath,
-      start:start,
-      thumb_path:selectedThumb?.path||null,
-      thumb_url:selectedThumb?.url||null,
-      id:selected?.id||null
-    }
+    let payload={caption_text:capTxt, raw_path:rawPath, start:start, thumb_path:selectedThumb?.path||null, thumb_url:selectedThumb?.url||null, id:selected?.id||null}
     let r=await fetch('/api/caption/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-    let j=await r.json()
-    if(!r.ok) throw new Error(j.detail||'Preview fail')
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'Preview fail')
     img.src=j.preview_url+'?t='+Date.now()
     img.onload=()=>{ img.style.opacity='1'; status.innerText=`Preview xong tại ${start.toFixed(1)}s - overlay + caption [đỏ] đã ghép. Nếu ok thì bấm Tạo video.` }
     box.scrollIntoView({behavior:'smooth', block:'nearest'})
-  }catch(e){
-    status.innerText='Lỗi preview: '+e.message
-    img.style.opacity='1'
-    console.error(e)
-  }
+  }catch(e){ status.innerText='Lỗi preview: '+e.message; img.style.opacity='1'; console.error(e) }
 }
 
 async function renderVideo(){
   let capTxt=document.getElementById('capInput')?.value||''
   if(!capTxt){ alert('Nhập caption trước, nhớ [đỏ]'); return }
-  let start=parseFloat(document.getElementById('wowStart')?.value)||selectedThumb?.start||0
-  let dur=parseFloat(document.getElementById('wowDur')?.value)||selectedThumb?.dur||5
+  let start=parseFloat(document.getElementById('wowStart')?.value)||selectedThumb?.start||selected.wow_start||0
+  let dur=5.0
   if(!selectedThumb) selectedThumb={start,dur}
   let btn=document.getElementById('btnRender'); let st=document.getElementById('renderStatus'); let resBox=document.getElementById('videoResult')
-  btn.disabled=true; st.innerText='Đang render (30-60s)...'; resBox.innerHTML='<div style="opacity:.6;font-size:12px">FFmpeg đang overlay PNG + caption...</div>'
+  btn.disabled=true; st.innerText='Đang render (30-60s)...'; resBox.innerHTML='<div style="opacity:.6;font-size:12px">FFmpeg đang overlay PNG + caption (5s cố định)...</div>'
   try{
     let r=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selected.id,link:selected.link,start:start,dur:dur,caption_text:capTxt,raw_path:rawPath})})
-    let j=await r.json()
-    if(!r.ok) throw new Error(j.detail||'Render fail')
-    st.innerText='Xong!'
-    resBox.innerHTML=`
-      <div class="video-result">
-        <video controls src="${j.video_720}" style="width:100%;max-width:360px;border-radius:12px;background:#000"></video>
-        <div style="margin-top:10px;display:flex;gap:8px">
-          <a href="${j.video_720}" download><button class="primary">Tải 720p ⬇️</button></a>
-          <a href="${j.video_1080}" download><button>Tải 1080p ⬇️</button></a>
-        </div>
-        <div style="font-size:12px;opacity:.6;margin-top:8px">Caption: ${escapeHtml(capTxt)} | File: ${j.video_720_name}</div>
-      </div>
-    `
-    fetchLinks()
-  }catch(e){
-    st.innerText='Lỗi: '+e.message
-    resBox.innerHTML=`<div style="color:#ff6b6b;font-size:12px">${e.message}</div>`
-  }
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'Render fail')
+    st.innerText='Xong!'; resBox.innerHTML=`<div class="video-result"><video controls src="${j.video_720}" style="width:100%;max-width:360px;border-radius:12px;background:#000"></video><div style="margin-top:10px;display:flex;gap:8px"><a href="${j.video_720}" download><button class="primary">Tải 720p ⬇️</button></a><a href="${j.video_1080}" download><button>Tải 1080p ⬇️</button></a></div><div style="font-size:12px;opacity:.6;margin-top:8px">Caption: ${escapeHtml(capTxt)} | File: ${j.video_720_name}</div></div>`; fetchLinks()
+  }catch(e){ st.innerText='Lỗi: '+e.message; resBox.innerHTML=`<div style="color:#ff6b6b;font-size:12px">${e.message}</div>` }
+  btn.disabled=false
+}
+
+// Modal logic
+function openAddModal(){
+  document.getElementById('addModal').classList.add('show')
+  document.getElementById('modalLink').value=''
+  document.getElementById('modalCaption').value=''
+  document.getElementById('modalRed').value=''
+  document.getElementById('modalWow').value=''
+  document.getElementById('modalNote').value=''
+  document.getElementById('addStatus').innerText=''
+}
+function closeAddModal(){ document.getElementById('addModal').classList.remove('show') }
+
+async function submitAdd(){
+  let link=document.getElementById('modalLink').value.trim()
+  if(!link){ alert('Nhập link'); return }
+  let caption=document.getElementById('modalCaption').value.trim()
+  let red=document.getElementById('modalRed').value.trim()
+  let wowVal=document.getElementById('modalWow').value
+  let wow= wowVal?parseFloat(wowVal):null
+  let note=document.getElementById('modalNote').value.trim()
+  let btn=document.getElementById('btnSubmitAdd'); let st=document.getElementById('addStatus')
+  btn.disabled=true; st.innerText='Đang thêm...'
+  try{
+    let body={link, caption, note, notes:note, title:caption||link}
+    if(wow!=null && !isNaN(wow)) body.wow_start=wow
+    if(red) { body.red_text=red; body.red=red }
+    let r=await fetch('/api/links',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||JSON.stringify(j))
+    st.innerText='Đã thêm ✓'; closeAddModal(); fetchLinks()
+  }catch(e){ st.innerText='Lỗi: '+e.message; alert('Thêm lỗi: '+e.message) }
   btn.disabled=false
 }
 
@@ -474,12 +645,11 @@ document.querySelectorAll('.tabs button').forEach(b=>{
   b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); filter=b.dataset.filter; fetchLinks() }
 })
 document.getElementById('search').addEventListener('input',e=>{q=e.target.value; renderList()})
-document.getElementById('btnAdd').onclick=async()=>{
-  let link=prompt('Dán link youtube / tiktok / facebook reel:')
-  if(!link) return
-  try{ await fetch('/api/links',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link})}) }catch{}
-  fetchLinks()
-}
+document.getElementById('btnAdd').onclick=openAddModal
+document.getElementById('btnCloseModal').onclick=closeAddModal
+document.getElementById('btnCancelAdd').onclick=closeAddModal
+document.getElementById('btnSubmitAdd').onclick=submitAdd
+document.getElementById('addModal').addEventListener('click',e=>{ if(e.target.id==='addModal') closeAddModal() })
 fetchLinks()
 </script>
 </body>
