@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Kho Content - Claw Shorts Manager v2</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:ui-sans,system-ui,-apple-system,Segoe UI,Roboto; background:#0e0e10;color:#e8e8ea;display:flex;height:100vh;overflow:hidden}
+button{cursor:pointer;border:1px solid #2a2a2e;background:#1e1e22;color:#e8e8ea;padding:8px 14px;border-radius:8px;font-size:13px;transition:.15s}
+button:hover{background:#26262c;border-color:#3a3a40}
+button.primary{background:#fff;color:#0e0e10;border-color:#fff;font-weight:700}
+button.primary:hover{background:#e8e8e8}
+button.ghost{background:transparent;border-color:#2a2a2e}
+button.small{padding:5px 10px;font-size:11px}
+button:disabled{opacity:.35;cursor:not-allowed}
+input,textarea{border:1px solid #2a2a2e;background:#16161a;color:#e8e8ea;border-radius:8px;padding:9px 11px;width:100%;font-size:13px}
+input:focus,textarea:focus{outline:none;border-color:#4a4a52;background:#1c1c20}
+input::placeholder,textarea::placeholder{color:#6a6a72}
+.sidebar{width:380px;border-right:1px solid #1e1e22;display:flex;flex-direction:column;background:#121214}
+.header{padding:14px 16px;border-bottom:1px solid #1e1e22;display:flex;justify-content:space-between;align-items:center}
+.tabs{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid #1e1e22}
+.tabs button{flex:1;padding:6px;font-size:12px;background:#1a1a1e;border-color:#2a2a2e}
+.tabs button.active{background:#fff;color:#0e0e10;border-color:#fff}
+.list{flex:1;overflow:auto}
+.item{padding:11px 12px;border-bottom:1px solid #1a1a1e;cursor:pointer;display:flex;gap:10px;transition:.12s}
+.item:hover{background:#1a1a1e}
+.item.selected{background:#1e1e22;color:#fff;border-left:2px solid #fff}
+.item .title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.item .meta{font-size:11px;color:#7a7a84;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tick{width:20px;height:20px;border:1px solid #3a3a44;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;background:#16161a;color:#5a5a66}
+.item.done .tick{background:#fff;color:#0e0e10;border-color:#fff}
+.item.selected .tick{border-color:#fff;color:#fff}
+.main{flex:1;overflow:auto;padding:20px;max-width:980px;background:#0e0e10}
+.card{border:1px solid #1e1e22;border-radius:12px;padding:16px;margin-bottom:16px;background:#151519}
+.label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#7a7a84;margin-bottom:10px;display:block;font-weight:700}
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.thumb{aspect-ratio:9/16;background:#0a0a0c;border-radius:8px;position:relative;overflow:hidden;border:2px solid #1e1e22;cursor:pointer;transition:.15s}
+.thumb:hover{border-color:#3a3a40}
+.thumb.selected{border-color:#fff;box-shadow:0 0 0 1px #fff}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .lb{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.75);color:#e8e8ea;font-size:10px;padding:5px 6px;backdrop-filter:blur(4px)}
+.preview-caption{border:1px dashed #2a2a2e;background:#101012;padding:12px;border-radius:8px;min-height:60px}
+.preview-caption .black{color:#e8e8ea;font-weight:700}
+.preview-caption .red{color:#ff3344;font-weight:800}
+.video-row{display:flex;gap:16px;flex-wrap:wrap}
+.video-box{flex:1;min-width:280px}
+.video-box video{width:100%;max-width:360px;border-radius:12px;background:#000;border:1px solid #1e1e22}
+.badge{font-size:10px;border:1px solid #2a2a2e;border-radius:999px;padding:3px 9px;color:#9a9aa4}
+.badge.done{background:#fff;color:#0e0e10;border-color:#fff}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:8px}
+.note{font-size:11px;color:#7a7a84}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="header">
+    <div><b>KHO LINK</b> <span id="count" style="font-size:12px;opacity:.6"></span></div>
+    <button id="btnAdd">+ Thêm link</button>
+  </div>
+  <div style="padding:8px 12px"><input id="search" placeholder="Tìm link, title, ghi chú..."/></div>
+  <div class="tabs">
+    <button data-filter="all" class="active">Tất cả</button>
+    <button data-filter="pending">Chưa làm</button>
+    <button data-filter="done">Đã xong ✓</button>
+  </div>
+  <div class="list" id="list"></div>
+</div>
+<div class="main" id="main">
+  <div style="opacity:.5;padding:40px">Chọn 1 link bên trái để bắt đầu</div>
+</div>
+
+<script>
+let links=[], filter='all', q='', selected=null, thumbs=[], selectedThumb=null, rawPath=null, rawUrl=null, customThumbs=[]
+
+function parseCaption(text){
+  if(!text) return []
+  let m=text.match(/\[(.+?)\]|\{(.+?)\}|\<(.+?)\>|\*\*(.+?)\*\*/)
+  if(m){
+    let red=m.slice(1).find(Boolean)
+    if(red){
+      let before=text.slice(0,m.index).trim().replace(/^[;:|,]+|[;:|,]+$/g,'')
+      let after=text.slice(m.index+m[0].length).trim().replace(/^[;:|,]+|[;:|,]+$/g,'')
+      let segs=[]
+      if(before) segs.push({text:before,color:'black'})
+      segs.push({text:red.trim(),color:'red'})
+      if(after) segs.push({text:after,color:'black'})
+      return segs
+    }
+  }
+  let parts=text.split(';;').map(s=>s.trim()).filter(Boolean)
+  if(parts.length===0) return []
+  if(parts.length===1) return [{text:parts[0],color:'black'}]
+  let segs=[]
+  if(parts[0]) segs.push({text:parts[0],color:'black'})
+  if(parts[1]) segs.push({text:parts[1],color:'red'})
+  if(parts[2]) segs.push({text:parts.slice(2).join(' '),color:'black'})
+  return segs
+}
+
+async function fetchLinks(){
+  let url=`/api/links?status=${filter}&q=${encodeURIComponent(q)}`
+  try{
+    let r=await fetch(url); let j=await r.json(); links=j.links||[]
+  }catch(e){
+    links=[{id:'1',link:'https://www.facebook.com/reel/1581865910246993',title:'Màn trình diễn nhìn thì vui',done:false,created_at:new Date().toISOString(),caption:'',note:''}]
+  }
+  renderList()
+}
+
+function renderList(){
+  let el=document.getElementById('list'); el.innerHTML=''
+  let filtered=links.filter(l=>{
+    if(filter==='pending' && l.done) return false
+    if(filter==='done' && !l.done) return false
+    if(q){
+      let hay=(l.link+' '+(l.title||'')+' '+(l.caption||'')+' '+(l.note||l.notes||'')).toLowerCase()
+      if(!hay.includes(q.toLowerCase())) return false
+    }
+    return true
+  })
+  document.getElementById('count').innerText=filtered.length
+  filtered.forEach(l=>{
+    let div=document.createElement('div')
+    div.className='item'+(l.done?' done':'')+(selected&&selected.id===l.id?' selected':'')
+    div.innerHTML=`
+      <div class="tick">${l.done?'✓':''}</div>
+      <div style="flex:1;min-width:0">
+        <div class="title">${escapeHtml(l.title||l.caption||l.link)}</div>
+        <div class="meta">${escapeHtml(l.link)}</div>
+        ${l.note||l.notes?`<div class="meta" style="color:#ff9">📝 ${escapeHtml((l.note||l.notes).slice(0,40))}</div>`:''}
+      </div>`
+    div.onclick=()=>selectLink(l.id)
+    el.appendChild(div)
+  })
+}
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])) }
+
+function selectLink(id){
+  selected=links.find(x=>x.id===id)
+  if(!selected) return
+  thumbs=[]; selectedThumb=null; rawPath=null; rawUrl=null; customThumbs=[]
+  renderDetail()
+  renderList()
+}
+
+function renderDetail(){
+  if(!selected) return
+  let main=document.getElementById('main')
+  main.innerHTML=`
+    <div class="card">
+      <span class="label">Link info - sửa tiêu đề & ghi chú</span>
+      <div class="col">
+        <div class="row"><span class="badge ${selected.done?'done':''}">${selected.done?'Đã xong ✓':'Chưa làm'}</span><span class="note">${new Date(selected.created_at).toLocaleString()}</span></div>
+        <div>
+          <div class="note">Link gốc</div>
+          <div class="row"><input id="linkUrl" value="${escapeHtml(selected.link)}" readonly/><button class="small" onclick="copyLink()">Copy</button></div>
+        </div>
+        <div>
+          <div class="note">Tiêu đề (đổi được)</div>
+          <div class="row"><input id="titleInput" value="${escapeHtml(selected.title||'')}" placeholder="Nhập tiêu đề mới..."/><button class="small primary" id="btnSaveTitle">Lưu tiêu đề</button></div>
+        </div>
+        <div>
+          <div class="note">Ghi chú / note nội bộ</div>
+          <textarea id="noteInput" rows="2" placeholder="VD: khách dặn cắt đoạn 0:05-0:10, gửi trước 9h...">${escapeHtml(selected.note||selected.notes||'')}</textarea>
+          <div class="row" style="margin-top:6px"><button class="small" id="btnSaveNote">Lưu ghi chú</button><span class="note" id="noteStatus"></span></div>
+        </div>
+        <div class="row">
+          <button id="btnToggleDone" class="${selected.done?'ghost':'primary'}">${selected.done?'↩️ Đánh dấu chưa xong':'✅ Đánh dấu đã xong (đã gửi)'}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="videoCard" style="display:none">
+      <span class="label">Video preview & wow moment - chọn đoạn wow trước khi lấy thumb</span>
+      <div class="video-row">
+        <div class="video-box">
+          <video id="rawVideo" controls playsinline></video>
+          <div class="row" style="margin-top:8px">
+            <span class="note" id="rawTime">0.0s / 0.0s</span>
+            <button class="small" id="btnCaptureTime">⏱ Lấy tại giây hiện tại</button>
+            <button class="small primary" id="btnGenCustomThumb">📸 Tạo thumb tại đây</button>
+          </div>
+        </div>
+        <div class="video-box col">
+          <div class="row"><div style="flex:1"><div class="note">Wow start (giây)</div><input id="wowStart" type="number" step="0.1" value="0"/></div><div style="flex:1"><div class="note">Duration (s)</div><input id="wowDur" type="number" step="0.1" value="5.0"/></div></div>
+          <div class="note">Tip: Xem video gốc, pause đúng lúc wow (vd khúc té, lửa bùng), bấm "Lấy tại giây hiện tại" -> thumb sẽ tự tạo theo wow đó.</div>
+          <div id="customThumbPreview" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="label">Thumb preview - 4 options + custom theo wow</span>
+      <div class="row" style="margin-bottom:10px">
+        <button id="btnThumbs" class="primary">Tải thumb thật</button>
+        <span class="note" id="thumbStatus">Chưa tải</span>
+      </div>
+      <div class="thumbs" id="thumbsBox"><div style="opacity:.4;font-size:12px">Bấm "Tải thumb thật" để tải video gốc và lấy 4 ảnh. Hoặc sau khi xem video preview, bấm "Tạo thumb tại đây" để lấy thumb theo wow.</div></div>
+    </div>
+
+    <div class="card">
+      <span class="label">Caption editor - [red] parsing live preview</span>
+      <textarea id="capInput" rows="3" placeholder="VD: Màn trình diễn nhìn thì vui [nhưng khúc này hơi thót tim] xem lại vẫn nổi da gà">${escapeHtml(selected.caption||'')}</textarea>
+      <div style="height:8px"></div>
+      <div class="preview-caption" id="capPreview"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnAI">Nghĩ hộ 🤖</button>
+        <button id="btnPreview">Preview text</button>
+        <button id="btnPreviewOverlay" class="primary">👁️ Xem trước overlay + caption</button>
+        <span class="note">Hỗ trợ [đỏ], {đỏ}, <đỏ>, **đỏ** hoặc ;; - VD: chữ đen [chữ đỏ] chữ đen</span>
+      </div>
+      <div id="overlayPreviewBox" style="display:none;margin-top:12px;border:1px solid #1e1e22;border-radius:12px;padding:12px;background:#0e0e10">
+        <span class="label">Preview thật - overlay ninja + caption trên thumb/wow</span>
+        <div class="row" style="align-items:flex-start">
+          <img id="overlayPreviewImg" style="width:270px;height:480px;object-fit:cover;border-radius:12px;border:1px solid #2a2a2e;background:#000" />
+          <div class="col" style="flex:1">
+            <div class="note" id="overlayPreviewStatus">Chưa có preview</div>
+            <div class="note" style="margin-top:8px">Đây là ảnh thật sau khi ghép: nền là frame tại wow start (hoặc thumb đang chọn) + overlay ninja + caption [đỏ]. Nếu ok thì bấm Tạo video.</div>
+            <div class="row" style="margin-top:12px"><button class="small" id="btnRefreshPreview">🔄 Làm mới preview</button><button class="small ghost" id="btnClosePreview">Đóng</button></div>
+          </div>
+        </div>
+      </div>
+      <div style="height:16px"></div>
+      <div class="row">
+        <button id="btnRender" class="primary">🎬 Tạo video (overlay + caption)</button>
+        <span class="note" id="renderStatus"></span>
+      </div>
+      <div id="videoResult" style="margin-top:12px"></div>
+    </div>
+  `
+  document.getElementById('btnSaveTitle').onclick=saveTitle
+  document.getElementById('btnSaveNote').onclick=saveNote
+  document.getElementById('btnToggleDone').onclick=toggleDone
+  document.getElementById('btnThumbs').onclick=loadThumbs
+  document.getElementById('btnAI').onclick=aiCaption
+  document.getElementById('btnPreview').onclick=updatePreview
+  document.getElementById('btnPreviewOverlay').onclick=previewOverlayCaption
+  document.getElementById('btnRefreshPreview').onclick=previewOverlayCaption
+  document.getElementById('btnClosePreview').onclick=()=>{ document.getElementById('overlayPreviewBox').style.display='none' }
+  document.getElementById('btnRender').onclick=renderVideo
+  // auto update text preview on typing
+  document.getElementById('capInput').addEventListener('input',updatePreview)
+  document.getElementById('titleInput').addEventListener('keydown',e=>{ if(e.key==='Enter') saveTitle() })
+  updatePreview()
+}
+
+async function copyLink(){ navigator.clipboard.writeText(selected.link) }
+
+async function saveTitle(){
+  let t=document.getElementById('titleInput').value
+  let btn=document.getElementById('btnSaveTitle'); btn.disabled=true; btn.innerText='Đang lưu...'
+  try{
+    let r=await fetch(`/api/links/${selected.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t})})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
+    selected.title=t
+    let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0) links[idx].title=t
+    renderList()
+  }catch(e){ alert('Lưu tiêu đề lỗi: '+e.message) }
+  btn.disabled=false; btn.innerText='Lưu tiêu đề'
+}
+
+async function saveNote(){
+  let n=document.getElementById('noteInput').value
+  let st=document.getElementById('noteStatus'); st.innerText='Đang lưu...'
+  try{
+    let r=await fetch(`/api/links/${selected.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:n, notes:n})})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
+    selected.note=n; selected.notes=n
+    let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0){ links[idx].note=n; links[idx].notes=n }
+    st.innerText='Đã lưu ✓'; setTimeout(()=>st.innerText='',2000)
+    renderList()
+  }catch(e){ st.innerText='Lỗi: '+e.message }
+}
+
+async function toggleDone(){
+  let btn=document.getElementById('btnToggleDone'); btn.disabled=true
+  try{
+    let r=await fetch(`/api/links/${selected.id}/toggle`,{method:'POST'})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
+    selected.done=j.done
+    let idx=links.findIndex(x=>x.id===selected.id); if(idx>=0) links[idx].done=j.done
+    renderDetail()
+    if(rawUrl) setupRawVideo(rawUrl, document.getElementById('wowStart')?.value||0)
+    fetchLinks()
+  }catch(e){ alert('Toggle lỗi: '+e.message) }
+  btn.disabled=false
+}
+
+function updatePreview(){
+  let txt=document.getElementById('capInput')?.value||''
+  let segs=parseCaption(txt)
+  let p=document.getElementById('capPreview')
+  if(!p) return
+  if(segs.length===0){p.innerHTML='<span style="opacity:.4">Chưa có caption - nhớ [đỏ]</span>'; return}
+  p.innerHTML=segs.map(s=>`<span class="${s.color}">${escapeHtml(s.text)} </span>`).join('')
+}
+
+async function loadThumbs(){
+  if(!selected) return
+  let btn=document.getElementById('btnThumbs'); let st=document.getElementById('thumbStatus')
+  btn.disabled=true; st.innerText='Đang tải video gốc & cắt thumb (10-20s)...'
+  try{
+    let r=await fetch('/api/thumbs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selected.id,link:selected.link})})
+    let j=await r.json()
+    if(!r.ok) throw new Error(j.detail||'Lỗi tải thumb')
+    rawPath=j.raw_path; rawUrl=j.raw_url
+    thumbs=j.thumbs
+    st.innerText=`Duration ${j.duration.toFixed(1)}s - chọn 1 thumb, hoặc xem video bên trên để chọn wow`
+    setupRawVideo(rawUrl, 0, j.duration)
+    renderThumbs()
+  }catch(e){
+    st.innerText='Lỗi: '+e.message
+  }
+  btn.disabled=false
+}
+
+function setupRawVideo(url, initialStart=0, duration=0){
+  let card=document.getElementById('videoCard')
+  if(!card) return
+  card.style.display='block'
+  let v=document.getElementById('rawVideo')
+  if(!v) return
+  v.src=url
+  v.load()
+  v.onloadedmetadata=()=>{
+    document.getElementById('rawTime').innerText=`0.0s / ${v.duration.toFixed(1)}s`
+    if(duration===0) duration=v.duration
+    let startInput=document.getElementById('wowStart')
+    if(startInput && parseFloat(startInput.value)===0){
+      let suggested=Math.max(0, v.duration-5.3)
+      startInput.value=suggested.toFixed(1)
+    }
+  }
+  v.ontimeupdate=()=>{
+    document.getElementById('rawTime').innerText=`${v.currentTime.toFixed(1)}s / ${v.duration.toFixed(1)}s`
+  }
+  document.getElementById('btnCaptureTime').onclick=()=>{
+    let cur=v.currentTime
+    document.getElementById('wowStart').value=cur.toFixed(1)
+    if(!selectedThumb) selectedThumb={start:cur,dur:5}
+    else selectedThumb.start=cur
+  }
+  document.getElementById('btnGenCustomThumb').onclick=genCustomThumb
+  document.getElementById('wowStart').addEventListener('input',e=>{
+    let val=parseFloat(e.target.value)||0
+    if(selectedThumb) selectedThumb.start=val
+    else selectedThumb={start:val,dur:5}
+  })
+  document.getElementById('wowDur').addEventListener('input',e=>{
+    let val=parseFloat(e.target.value)||5
+    if(selectedThumb) selectedThumb.dur=val
+  })
+}
+
+async function genCustomThumb(){
+  if(!selected) return
+  let start=parseFloat(document.getElementById('wowStart').value)||0
+  let status=document.getElementById('thumbStatus')
+  status.innerText=`Đang tạo thumb tại ${start.toFixed(1)}s...`
+  try{
+    let r=await fetch('/api/thumb_custom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selected.id, raw_path:rawPath, start})})
+    let j=await r.json(); if(!r.ok) throw new Error(j.detail||'fail')
+    let t=j.thumb
+    customThumbs.push(t)
+    selectedThumb=t
+    renderThumbs()
+    document.getElementById('customThumbPreview').innerHTML=`<div class="note">Custom thumb mới:</div><img src="${t.url}" style="width:120px;border-radius:8px;border:2px solid #fff;margin-top:6px"/>`
+    status.innerText=`Đã tạo thumb custom tại ${start.toFixed(1)}s - đã chọn luôn để render`
+  }catch(e){ status.innerText='Lỗi custom thumb: '+e.message }
+}
+
+function renderThumbs(){
+  let box=document.getElementById('thumbsBox'); box.innerHTML=''
+  let all=[...thumbs, ...customThumbs]
+  all.forEach((t,i)=>{
+    let div=document.createElement('div'); div.className='thumb'+(selectedThumb&&selectedThumb.url===t.url?' selected':'')
+    if(i===0 && !selectedThumb){ selectedThumb=t; div.classList.add('selected') }
+    div.innerHTML=`<img src="${t.url}" onerror="this.style.background='#222'"/><div class="lb">${escapeHtml(t.label)}</div>`
+    div.onclick=()=>{
+      selectedThumb=t
+      document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('selected'))
+      div.classList.add('selected')
+      let ws=document.getElementById('wowStart')
+      if(ws) ws.value=t.start.toFixed(1)
+      let wd=document.getElementById('wowDur')
+      if(wd) wd.value=(t.dur||5).toFixed(1)
+    }
+    box.appendChild(div)
+  })
+}
+
+async function aiCaption(){
+  let btn=document.getElementById('btnAI'); btn.disabled=true; btn.innerText='Đang nghĩ...'
+  try{
+    let r=await fetch('/api/caption/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:selected?.title||'',context:selected?.link||''})})
+    let j=await r.json()
+    if(j.text){ document.getElementById('capInput').value=j.text; updatePreview() }
+  }catch(e){
+    let fallback=["Tưởng chỉ là tiết mục bình thường [ai ngờ lửa bùng ngay trước mắt] cả sân khấu nín thở","Đang diễn rất bình thường [tới đoạn này ai cũng đứng hình] đúng là không đoán trước được","Màn trình diễn nhìn thì vui [nhưng khúc này hơi thót tim] xem lại vẫn nổi da gà","Cứ tưởng thế nào, chứ [đếm tiền kiểu này] có ngày cháy túi"]
+    document.getElementById('capInput').value=fallback[Math.floor(Math.random()*fallback.length)]
+    updatePreview()
+  }
+  btn.disabled=false; btn.innerText='Nghĩ hộ 🤖'
+}
+
+async function previewOverlayCaption(){
+  let capTxt=document.getElementById('capInput')?.value||''
+  if(!capTxt){ alert('Nhập caption trước, nhớ [đỏ]'); return }
+  let start=parseFloat(document.getElementById('wowStart')?.value)||selectedThumb?.start||0
+  let status=document.getElementById('overlayPreviewStatus')
+  let box=document.getElementById('overlayPreviewBox')
+  let img=document.getElementById('overlayPreviewImg')
+  if(!box || !img || !status){ console.error('preview elements not found'); return }
+  box.style.display='block'
+  status.innerText=`Đang tạo preview tại ${start.toFixed(1)}s...`
+  img.style.opacity='0.5'
+  try{
+    let payload={
+      caption_text:capTxt,
+      raw_path:rawPath,
+      start:start,
+      thumb_path:selectedThumb?.path||null,
+      thumb_url:selectedThumb?.url||null,
+      id:selected?.id||null
+    }
+    let r=await fetch('/api/caption/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    let j=await r.json()
+    if(!r.ok) throw new Error(j.detail||'Preview fail')
+    img.src=j.preview_url+'?t='+Date.now()
+    img.onload=()=>{ img.style.opacity='1'; status.innerText=`Preview xong tại ${start.toFixed(1)}s - overlay + caption [đỏ] đã ghép. Nếu ok thì bấm Tạo video.` }
+    box.scrollIntoView({behavior:'smooth', block:'nearest'})
+  }catch(e){
+    status.innerText='Lỗi preview: '+e.message
+    img.style.opacity='1'
+    console.error(e)
+  }
+}
+
+async function renderVideo(){
+  let capTxt=document.getElementById('capInput')?.value||''
+  if(!capTxt){ alert('Nhập caption trước, nhớ [đỏ]'); return }
+  let start=parseFloat(document.getElementById('wowStart')?.value)||selectedThumb?.start||0
+  let dur=parseFloat(document.getElementById('wowDur')?.value)||selectedThumb?.dur||5
+  if(!selectedThumb) selectedThumb={start,dur}
+  let btn=document.getElementById('btnRender'); let st=document.getElementById('renderStatus'); let resBox=document.getElementById('videoResult')
+  btn.disabled=true; st.innerText='Đang render (30-60s)...'; resBox.innerHTML='<div style="opacity:.6;font-size:12px">FFmpeg đang overlay PNG + caption...</div>'
+  try{
+    let r=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selected.id,link:selected.link,start:start,dur:dur,caption_text:capTxt,raw_path:rawPath})})
+    let j=await r.json()
+    if(!r.ok) throw new Error(j.detail||'Render fail')
+    st.innerText='Xong!'
+    resBox.innerHTML=`
+      <div class="video-result">
+        <video controls src="${j.video_720}" style="width:100%;max-width:360px;border-radius:12px;background:#000"></video>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <a href="${j.video_720}" download><button class="primary">Tải 720p ⬇️</button></a>
+          <a href="${j.video_1080}" download><button>Tải 1080p ⬇️</button></a>
+        </div>
+        <div style="font-size:12px;opacity:.6;margin-top:8px">Caption: ${escapeHtml(capTxt)} | File: ${j.video_720_name}</div>
+      </div>
+    `
+    fetchLinks()
+  }catch(e){
+    st.innerText='Lỗi: '+e.message
+    resBox.innerHTML=`<div style="color:#ff6b6b;font-size:12px">${e.message}</div>`
+  }
+  btn.disabled=false
+}
+
+document.querySelectorAll('.tabs button').forEach(b=>{
+  b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); filter=b.dataset.filter; fetchLinks() }
+})
+document.getElementById('search').addEventListener('input',e=>{q=e.target.value; renderList()})
+document.getElementById('btnAdd').onclick=async()=>{
+  let link=prompt('Dán link youtube / tiktok / facebook reel:')
+  if(!link) return
+  try{ await fetch('/api/links',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link})}) }catch{}
+  fetchLinks()
+}
+fetchLinks()
+</script>
+</body>
+</html>
