@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Kho Content - OFFLINE Full Render</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:ui-sans,system-ui,-apple-system,Segoe UI,Roboto; background:#0e0e10;color:#e8e8ea;display:flex;height:100vh;overflow:hidden}
+button{cursor:pointer;border:1px solid #2a2a2e;background:#1e1e22;color:#e8e8ea;padding:8px 14px;border-radius:8px;font-size:13px;transition:.15s}
+button:hover{background:#26262c;border-color:#3a3a40}
+button.primary{background:#fff;color:#0e0e10;border-color:#fff;font-weight:700}
+button.primary:hover{background:#e8e8e8}
+button.ghost{background:transparent;border-color:#2a2a2e}
+button.danger{border-color:#4a1a1a;background:#2a1515;color:#ff6b6b}
+button.small{padding:5px 10px;font-size:11px}
+button:disabled{opacity:.35;cursor:not-allowed}
+input,textarea{border:1px solid #2a2a2e;background:#16161a;color:#e8e8ea;border-radius:8px;padding:9px 11px;width:100%;font-size:13px}
+input:focus,textarea:focus{outline:none;border-color:#4a4a52;background:#1c1c20}
+.sidebar{width:360px;border-right:1px solid #1e1e22;display:flex;flex-direction:column;background:#121214}
+.header{padding:14px 16px;border-bottom:1px solid #1e1e22;display:flex;justify-content:space-between;align-items:center}
+.tabs{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid #1e1e22}
+.tabs button{flex:1;padding:6px;font-size:12px;background:#1a1a1e;border-color:#2a2a2e}
+.tabs button.active{background:#fff;color:#0e0e10;border-color:#fff}
+.list{flex:1;overflow:auto}
+.item{padding:11px 12px;border-bottom:1px solid #1a1a1e;cursor:pointer;display:flex;gap:10px;transition:.12s}
+.item:hover{background:#1a1a1e}
+.item.selected{background:#1e1e22;color:#fff;border-left:2px solid #fff}
+.item .title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.item .meta{font-size:11px;color:#7a7a84;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tick{width:20px;height:20px;border:1px solid #3a3a44;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;background:#16161a;color:#5a5a66}
+.item.done .tick{background:#fff;color:#0e0e10;border-color:#fff}
+.main{flex:1;overflow:auto;padding:20px;max-width:1100px;background:#0e0e10}
+.card{border:1px solid #1e1e22;border-radius:12px;padding:16px;margin-bottom:16px;background:#151519}
+.label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#7a7a84;margin-bottom:10px;display:block;font-weight:700}
+.preview-caption{border:1px dashed #2a2a2e;background:#101012;padding:12px;border-radius:8px;min-height:60px}
+.preview-caption .black{color:#e8e8ea;font-weight:700}
+.preview-caption .red{color:#ff3344;font-weight:800}
+.video-row{display:flex;gap:16px;flex-wrap:wrap}
+.video-box{flex:1;min-width:300px}
+.video-box video{width:100%;max-width:360px;border-radius:12px;background:#000;border:1px solid #1e1e22}
+.badge{font-size:10px;border:1px solid #2a2a2e;border-radius:999px;padding:3px 9px;color:#9a9aa4}
+.badge.done{background:#fff;color:#0e0e10;border-color:#fff}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:8px}
+.note{font-size:11px;color:#7a7a84}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field-label{font-size:11px;color:#9a9aa4;font-weight:600;display:flex;justify-content:space-between}
+.field-row{display:flex;gap:8px;align-items:center}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal-overlay.show{display:flex}
+.modal{background:#151519;border:1px solid #2a2a2e;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow:auto;padding:20px}
+.offline-badge{background:#ffcc00;color:#000;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;margin-left:8px}
+.warn{border:1px solid #3a2a00;background:#1a1600;color:#ffcc66;padding:10px;border-radius:8px;font-size:12px;margin-bottom:12px}
+canvas{max-width:100%}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="header"><div><b>KHO LINK</b> <span class="offline-badge">OFFLINE RENDER</span> <span id="count" style="font-size:12px;opacity:.6"></span></div><button id="btnAdd">+ Thêm</button></div>
+  <div style="padding:8px 12px;display:flex;gap:6px"><input id="search" placeholder="Tìm..." style="flex:1"/><button class="small ghost" id="btnExport">⬇️</button><button class="small ghost" id="btnImport">⬆️</button><input type="file" id="importFile" accept=".json" style="display:none"/></div>
+  <div class="tabs"><button data-filter="all" class="active">Tất cả</button><button data-filter="pending">Chưa làm</button><button data-filter="done">Đã xong</button></div>
+  <div class="list" id="list"></div>
+</div>
+<div class="main" id="main"><div style="opacity:.5;padding:40px">Chọn link hoặc thêm mới. Bản offline render: tải video từ máy, không tải được từ Youtube/TikTok/FB vì cần yt-dlp backend.</div></div>
+
+<div class="modal-overlay" id="addModal"><div class="modal">
+  <div style="display:flex;justify-content:space-between;margin-bottom:12px"><b>+ Thêm link mới</b><button class="small ghost" id="btnCloseModal">✕</button></div>
+  <div class="field"><div class="field-label">Link *</div><input id="modalLink" placeholder="https://..."/></div>
+  <div class="field"><div class="field-label">Caption</div><textarea id="modalCaption" rows="2"></textarea></div>
+  <div class="field"><div class="field-label">Red text</div><input id="modalRed" placeholder="chữ đỏ"/></div>
+  <div class="field"><div class="field-label">Wow start (giây)</div><input id="modalWow" type="number" step="0.1"/></div>
+  <div class="field"><div class="field-label">Ghi chú</div><textarea id="modalNote" rows="2"></textarea></div>
+  <div class="row"><button id="btnSubmitAdd" class="primary">Thêm</button><button id="btnCancelAdd" class="ghost">Hủy</button><span class="note" id="addStatus"></span></div>
+</div></div>
+
+<script>
+const KEY='kho_offline_links_v4';
+let links=[], filter='all', q='', selected=null, selectedThumb=null, thumbs=[], customThumbs=[], rawFile=null, uploadedUrl=null;
+function loadLinks(){ try{ let d=localStorage.getItem(KEY); if(d) links=JSON.parse(d); else links=[{id:'demo1',link:'https://fb.com/reel/demo',title:'Demo',caption:'Màn trình diễn [hơi thót tim] xem lại vẫn nổi da gà',red_text:'hơi thót tim',wow_start:2.5,note:'offline render demo',done:false,created_at:new Date().toISOString()}]; }catch(e){links=[]} }
+function saveLinks(){ localStorage.setItem(KEY, JSON.stringify(links)); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function parseCaption(text){
+  if(!text) return [];
+  let m=text.match(/\[(.+?)\]|\{(.+?)}|\<(.+?)\>|\*\*(.+?)\*\*/);
+  if(m){ let red=m.slice(1).find(Boolean); if(red){ let before=text.slice(0,m.index).trim().replace(/^[;:|,]+|[;:|,]+$/g,''); let after=text.slice(m.index+m[0].length).trim().replace(/^[;:|,]+|[;:|,]+$/g,''); let segs=[]; if(before) segs.push({text:before,color:'black'}); segs.push({text:red.trim(),color:'red'}); if(after) segs.push({text:after,color:'black'}); return segs; } }
+  let parts=text.split(';;').map(s=>s.trim()).filter(Boolean); if(parts.length===0) return []; if(parts.length===1) return [{text:parts[0],color:'black'}];
+  let segs=[]; if(parts[0]) segs.push({text:parts[0],color:'black'}); if(parts[1]) segs.push({text:parts[1],color:'red'}); if(parts[2]) segs.push({text:parts.slice(2).join(' '),color:'black'}); return segs;
+}
+function renderList(){
+  let el=document.getElementById('list'); el.innerHTML='';
+  let filtered=links.filter(l=>{
+    if(filter==='pending'&&l.done) return false;
+    if(filter==='done'&&!l.done) return false;
+    if(q){ let hay=(l.link+' '+(l.title||'')+' '+(l.caption||'')+' '+(l.note||'')+' '+(l.red_text||'')).toLowerCase(); if(!hay.includes(q.toLowerCase())) return false; }
+    return true;
+  });
+  document.getElementById('count').innerText=filtered.length;
+  filtered.forEach(l=>{
+    let div=document.createElement('div'); div.className='item'+(l.done?' done':'')+(selected&&selected.id===l.id?' selected':'');
+    div.innerHTML=`<div class="tick">${l.done?'✓':''}</div><div style="flex:1;min-width:0"><div class="title">${escapeHtml(l.title||l.caption||l.link)}</div><div class="meta">${escapeHtml(l.link.slice(0,50))}</div><div class="meta">${l.wow_start!=null?`⏱${l.wow_start}s `:''}${l.red_text?`🔴${escapeHtml(l.red_text)} `:''}${escapeHtml((l.caption||'').slice(0,50))}</div></div>`;
+    div.onclick=()=>selectLink(l.id); el.appendChild(div);
+  });
+}
+function selectLink(id){ selected=links.find(x=>x.id===id); if(!selected) return; thumbs=[]; customThumbs=[]; selectedThumb=null; rawFile=null; if(uploadedUrl){ URL.revokeObjectURL(uploadedUrl); uploadedUrl=null; } renderDetail(); renderList(); }
+
+function renderDetail(){
+  if(!selected) return;
+  let main=document.getElementById('main');
+  main.innerHTML=`
+    <div class="card"><span class="label">Link info - offline editable</span>
+      <div class="field"><div class="field-label">Link <span class="note" id="linkStatus"></span></div><div class="field-row"><input id="linkUrl" value="${escapeHtml(selected.link)}"/><button class="small primary" id="btnSaveLink">Lưu</button></div></div>
+      <div class="field"><div class="field-label">Tiêu đề <span class="note" id="titleStatus"></span></div><div class="field-row"><input id="titleInput" value="${escapeHtml(selected.title||'')}"/><button class="small primary" id="btnSaveTitle">Lưu</button></div></div>
+      <div class="field"><div class="field-label">Caption [đỏ] <span class="note" id="capFieldStatus"></span></div><textarea id="captionFieldInput" rows="2">${escapeHtml(selected.caption||'')}</textarea><div class="field-row"><button class="small primary" id="btnSaveCaptionField">Lưu</button><button class="small ghost" id="btnBuildFromRed">Tạo từ red</button></div></div>
+      <div class="field"><div class="field-label">Red text <span class="note" id="redStatus"></span></div><div class="field-row"><input id="redInput" value="${escapeHtml(selected.red_text||'')}"/><button class="small primary" id="btnSaveRed">Lưu</button><button class="small ghost" id="btnApplyRed">Chèn vào caption</button></div></div>
+      <div class="field"><div class="field-label">Wow start (giây) - duration 5s cố định <span class="note" id="wowStatus"></span></div><div class="field-row"><input id="wowStartField" type="number" step="0.1" value="${selected.wow_start||0}" style="max-width:120px"/><button class="small primary" id="btnSaveWow">Lưu</button></div></div>
+      <div class="field"><div class="field-label">Ghi chú <span class="note" id="noteStatus"></span></div><textarea id="noteInput" rows="2">${escapeHtml(selected.note||'')}</textarea><button class="small primary" id="btnSaveNote">Lưu ghi chú</button></div>
+      <div class="row"><button id="btnToggleDone" class="${selected.done?'ghost':'primary'}">${selected.done?'↩️ Chưa xong':'✅ Đã xong'}</button><button id="btnDelete" class="small danger">🗑️ Xóa</button></div>
+    </div>
+
+    <div class="card">
+      <span class="label">Video - tải file local (không tải được link Youtube/FB offline)</span>
+      <div class="warn">⚠️ Bản offline 1 file KHÔNG tải được video từ link Youtube/TikTok/Facebook vì cần yt-dlp + backend. Để tải link thì dùng bản online trên VPS (có /api/thumbs). Ở bản offline này, bấm "Chọn file video" để lấy video từ máy tính rồi render.</div>
+      <div class="video-row">
+        <div class="video-box">
+          <input type="file" id="videoFile" accept="video/*"/>
+          <video id="rawVideo" controls playsinline style="display:none;margin-top:8px"></video>
+          <canvas id="hiddenCanvas" style="display:none"></canvas>
+          <div class="row" style="margin-top:8px"><span class="note" id="rawTime">Chưa chọn video</span><button class="small" id="btnCapture">⏱ Lấy tại giây hiện tại</button><button class="small primary" id="btnGenThumbs">📸 Tạo 4 thumb</button></div>
+        </div>
+        <div class="video-box col">
+          <div class="row"><div style="flex:1"><div class="note">Wow start</div><input id="wowStart" type="number" step="0.1" value="${selected.wow_start||0}"/></div><div style="flex:1"><div class="note">Duration</div><input value="5.0" readonly style="opacity:.6"/></div></div>
+          <div id="customThumbPreview"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card"><span class="label">Thumb preview (canvas offline)</span><div class="thumbs" id="thumbsBox"><div style="opacity:.4;font-size:12px">Chọn file video rồi tạo thumb</div></div></div>
+
+    <div class="card">
+      <span class="label">Caption editor</span>
+      <textarea id="capInput" rows="3">${escapeHtml(selected.caption||'')}</textarea>
+      <div style="height:8px"></div><div class="preview-caption" id="capPreview"></div>
+      <div class="row" style="margin-top:10px"><button id="btnPreview" class="small">Preview text</button><button id="btnPreviewOverlay" class="small primary">👁️ Preview canvas</button></div>
+      <div id="overlayPreviewBox" style="display:none;margin-top:12px;border:1px solid #1e1e22;border-radius:12px;padding:12px;background:#0e0e10">
+        <div class="row" style="align-items:flex-start">
+          <canvas id="overlayCanvas" width="540" height="960" style="width:270px;height:480px;border-radius:12px;border:1px solid #2a2a2e;background:#000"></canvas>
+          <div class="col" style="flex:1"><div class="note" id="overlayStatus">Chưa preview</div><div class="row" style="margin-top:8px"><button class="small" id="btnDownloadImg">⬇️ Tải ảnh preview</button><button class="small ghost" id="btnClosePreview">Đóng</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="label">🎬 Render video offline (canvas + MediaRecorder) - không cần ffmpeg</span>
+      <div class="warn">Render offline: sẽ lấy đoạn 5s từ wow_start, vẽ caption đen đỏ lên từng frame, xuất video mp4 bằng trình duyệt. Chất lượng phụ thuộc trình duyệt, không có overlay ninja.</div>
+      <div class="row">
+        <button id="btnRenderOffline" class="primary">🎬 Render 5s offline</button>
+        <span class="note" id="renderStatus"></span>
+      </div>
+      <div id="videoResult" style="margin-top:12px"></div>
+      <canvas id="renderCanvas" width="1080" height="1920" style="display:none"></canvas>
+    </div>
+  `;
+  document.getElementById('btnSaveLink').onclick=()=>{ let v=document.getElementById('linkUrl').value.trim(); if(!v) return alert('Trống'); updateField({link:v},'linkStatus'); };
+  document.getElementById('btnSaveTitle').onclick=()=>{ updateField({title:document.getElementById('titleInput').value},'titleStatus'); };
+  document.getElementById('btnSaveCaptionField').onclick=()=>{ let v=document.getElementById('captionFieldInput').value; updateField({caption:v},'capFieldStatus'); document.getElementById('capInput').value=v; updatePreview(); };
+  document.getElementById('btnSaveRed').onclick=()=>{ let v=document.getElementById('redInput').value.trim(); updateField({red_text:v, red:v},'redStatus'); };
+  document.getElementById('btnSaveWow').onclick=()=>{ let v=parseFloat(document.getElementById('wowStartField').value); if(isNaN(v)) return alert('Nhập số'); updateField({wow_start:v},'wowStatus'); document.getElementById('wowStart').value=v; };
+  document.getElementById('btnSaveNote').onclick=()=>{ updateField({note:document.getElementById('noteInput').value},'noteStatus'); };
+  document.getElementById('btnBuildFromRed').onclick=buildFromRed;
+  document.getElementById('btnApplyRed').onclick=applyRed;
+  document.getElementById('btnToggleDone').onclick=()=>{ updateField({done:!selected.done}); renderDetail(); };
+  document.getElementById('btnDelete').onclick=()=>{ if(!confirm('Xóa?')) return; links=links.filter(x=>x.id!==selected.id); selected=null; saveLinks(); document.getElementById('main').innerHTML='<div style="padding:40px;opacity:.5">Đã xóa</div>'; renderList(); };
+  document.getElementById('btnPreview').onclick=updatePreview;
+  document.getElementById('btnPreviewOverlay').onclick=previewCanvas;
+  document.getElementById('btnClosePreview').onclick=()=>document.getElementById('overlayPreviewBox').style.display='none';
+  document.getElementById('btnDownloadImg').onclick=downloadImg;
+  document.getElementById('videoFile').onchange=handleFile;
+  document.getElementById('btnCapture').onclick=captureTime;
+  document.getElementById('btnGenThumbs').onclick=genThumbs;
+  document.getElementById('btnRenderOffline').onclick=renderOffline;
+  document.getElementById('capInput').addEventListener('input',updatePreview);
+  document.getElementById('captionFieldInput').addEventListener('input',()=>{ document.getElementById('capInput').value=document.getElementById('captionFieldInput').value; updatePreview(); });
+  document.getElementById('wowStartField').addEventListener('input',e=>{ document.getElementById('wowStart').value=e.target.value; });
+  document.getElementById('wowStart').addEventListener('input',e=>{ document.getElementById('wowStartField').value=e.target.value; });
+  updatePreview();
+}
+function updateField(upd,statusId){
+  let idx=links.findIndex(x=>x.id===selected.id); if(idx<0) return;
+  Object.assign(links[idx],upd); Object.assign(selected,upd); saveLinks();
+  let st=document.getElementById(statusId); if(st){ st.innerText='Đã lưu ✓'; setTimeout(()=>st.innerText='',1500); }
+  renderList();
+}
+function buildFromRed(){
+  let cap=document.getElementById('captionFieldInput').value.trim();
+  let red=document.getElementById('redInput').value.trim();
+  if(!red) return alert('Nhập red');
+  if(!cap) cap=red;
+  if(cap.includes(red)&&!cap.includes(`[${red}]`)) cap=cap.replace(red,`[${red}]`);
+  else if(!cap.includes(`[${red}]`)) cap=`${cap} [${red}]`;
+  document.getElementById('captionFieldInput').value=cap; document.getElementById('capInput').value=cap; updatePreview();
+}
+function applyRed(){ buildFromRed(); }
+function updatePreview(){
+  let txt=document.getElementById('capInput')?.value||''; let segs=parseCaption(txt); let p=document.getElementById('capPreview'); if(!p) return;
+  if(segs.length===0){ p.innerHTML='<span style="opacity:.4">Chưa có caption - nhớ [đỏ]</span>'; return; }
+  p.innerHTML=segs.map(s=>`<span class="${s.color}">${escapeHtml(s.text)} </span>`).join('');
+}
+function handleFile(e){
+  let file=e.target.files[0]; if(!file) return; rawFile=file;
+  if(uploadedUrl) URL.revokeObjectURL(uploadedUrl);
+  uploadedUrl=URL.createObjectURL(file);
+  let v=document.getElementById('rawVideo'); v.style.display='block'; v.src=uploadedUrl; v.load();
+  v.onloadedmetadata=()=>{ document.getElementById('rawTime').innerText=`${v.duration.toFixed(1)}s`; let sug=Math.max(0,v.duration-5.3); document.getElementById('wowStart').value=sug.toFixed(1); document.getElementById('wowStartField').value=sug.toFixed(1); };
+  v.ontimeupdate=()=>{ document.getElementById('rawTime').innerText=`${v.currentTime.toFixed(1)}s / ${v.duration.toFixed(1)}s`; };
+}
+function captureTime(){
+  let v=document.getElementById('rawVideo'); if(!v||isNaN(v.currentTime)) return alert('Chưa có video');
+  let cur=v.currentTime; document.getElementById('wowStart').value=cur.toFixed(1); document.getElementById('wowStartField').value=cur.toFixed(1);
+  createThumb(cur,`Custom: ${cur.toFixed(1)}s`);
+}
+function genThumbs(){
+  let v=document.getElementById('rawVideo'); if(!v||!v.duration) return alert('Chọn video');
+  let dur=v.duration; let times=[{t:Math.max(0,dur-5),label:`5s cuối`},{t:dur*0.3,label:`30%`},{t:dur*0.6,label:`60%`},{t:dur*0.8,label:`80%`}];
+  thumbs=[]; customThumbs=[]; let canvas=document.getElementById('hiddenCanvas'); let ctx=canvas.getContext('2d');
+  let i=0; function next(){ if(i>=times.length){ renderThumbs(); return; } let it=times[i]; v.currentTime=it.t; setTimeout(()=>{ canvas.width=v.videoWidth||540; canvas.height=v.videoHeight||960; ctx.drawImage(v,0,0,canvas.width,canvas.height); let url=canvas.toDataURL('image/jpeg',0.8); thumbs.push({url,start:it.t,dur:5,label:it.label}); i++; next(); },300); } next();
+}
+function createThumb(time,label){
+  let v=document.getElementById('rawVideo'); let canvas=document.getElementById('hiddenCanvas'); let ctx=canvas.getContext('2d');
+  let prev=v.currentTime; v.currentTime=time; setTimeout(()=>{ canvas.width=v.videoWidth||540; canvas.height=v.videoHeight||960; ctx.drawImage(v,0,0,canvas.width,canvas.height); let url=canvas.toDataURL('image/jpeg',0.8); let t={url,start:time,dur:5,label}; customThumbs.push(t); selectedThumb=t; renderThumbs(); document.getElementById('customThumbPreview').innerHTML=`<img src="${url}" style="width:120px;border-radius:8px;margin-top:6px"/>`; v.currentTime=prev; },200);
+}
+function renderThumbs(){
+  let box=document.getElementById('thumbsBox'); box.innerHTML=''; let all=[...thumbs,...customThumbs]; if(all.length===0){ box.innerHTML='<div style="opacity:.4">Chưa có thumb</div>'; return; }
+  all.forEach((t,i)=>{ let div=document.createElement('div'); div.className='thumb'+(selectedThumb&&selectedThumb.url===t.url?' selected':''); if(i===0&&!selectedThumb){ selectedThumb=t; div.classList.add('selected'); } div.innerHTML=`<img src="${t.url}"/><div class="lb">${escapeHtml(t.label)}</div>`; div.onclick=()=>{ selectedThumb=t; document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('selected')); div.classList.add('selected'); document.getElementById('wowStart').value=t.start.toFixed(1); document.getElementById('wowStartField').value=t.start.toFixed(1); }; box.appendChild(div); });
+}
+function previewCanvas(){
+  let cap=document.getElementById('capInput')?.value||''; if(!cap) return alert('Nhập caption');
+  let start=parseFloat(document.getElementById('wowStart')?.value)||0;
+  let box=document.getElementById('overlayPreviewBox'); let canvas=document.getElementById('overlayCanvas'); let status=document.getElementById('overlayStatus');
+  box.style.display='block'; status.innerText=`Đang vẽ preview tại ${start.toFixed(1)}s...`;
+  let ctx=canvas.getContext('2d'); canvas.width=1080; canvas.height=1920; ctx.fillStyle='#0e0e10'; ctx.fillRect(0,0,1080,1920);
+  function drawCaption(){
+    let segs=parseCaption(cap); let words=[]; segs.forEach(s=>s.text.split(' ').forEach(w=>{ if(w) words.push({text:w,color:s.color}); }));
+    ctx.textAlign='left'; let y=1920-350;
+    // simple wrap
+    let lines=[]; let cur=[]; let curW=0; ctx.font='bold 44px sans-serif';
+    words.forEach(w=>{ let wW=ctx.measureText(w.text+' ').width; if(curW+wW>800&&cur.length>0){ lines.push(cur); cur=[w]; curW=wW; } else { cur.push(w); curW+=wW; } });
+    if(cur.length) lines.push(cur);
+    lines.slice(-5).forEach((line,idx)=>{
+      let lineY=y - (lines.length-1-idx)*70;
+      let x=140; // CAPTION_X_OFFSET
+      line.forEach(w=>{
+        ctx.font=w.color==='red'?'bold 48px sans-serif':'bold 44px sans-serif';
+        ctx.strokeStyle='#fff'; ctx.lineWidth=8; ctx.strokeText(w.text, x, lineY);
+        ctx.fillStyle=w.color==='red'?'#ff3344':'#0a0a0a'; ctx.fillText(w.text, x, lineY);
+        x+=ctx.measureText(w.text).width+18;
+      });
+    });
+    status.innerText=`Preview xong tại ${start.toFixed(1)}s`;
+  }
+  if(selectedThumb&&selectedThumb.url){
+    let img=new Image(); img.onload=()=>{ ctx.drawImage(img,0,0,1080,1920); drawCaption(); }; img.src=selectedThumb.url;
+  } else { drawCaption(); }
+}
+function downloadImg(){
+  let c=document.getElementById('overlayCanvas'); let a=document.createElement('a'); a.download=`preview_${Date.now()}.jpg`; a.href=c.toDataURL('image/jpeg',0.85); a.click();
+}
+
+// OFFLINE RENDER - canvas + MediaRecorder
+async function renderOffline(){
+  let cap=document.getElementById('capInput')?.value||''; if(!cap) return alert('Nhập caption');
+  let v=document.getElementById('rawVideo'); if(!v||!v.src) return alert('Chọn file video trước');
+  let start=parseFloat(document.getElementById('wowStart').value)||0;
+  let dur=5.0;
+  let status=document.getElementById('renderStatus'); let result=document.getElementById('videoResult');
+  status.innerText='Đang render offline 5s...';
+  result.innerHTML='<div class="note">Đang ghi hình...</div>';
+  let canvas=document.getElementById('renderCanvas');
+  let ctx=canvas.getContext('2d');
+  canvas.width=1080; canvas.height=1920;
+  let stream=canvas.captureStream(30);
+  let recorder=new MediaRecorder(stream, {mimeType:'video/webm;codecs=vp9'});
+  let chunks=[];
+  recorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
+  recorder.onstop=()=>{
+    let blob=new Blob(chunks,{type:'video/webm'});
+    let url=URL.createObjectURL(blob);
+    result.innerHTML=`<video controls src="${url}" style="width:100%;max-width:360px;border-radius:12px;background:#000"></video><div style="margin-top:8px"><a href="${url}" download="short_offline_${Date.now()}.webm"><button class="primary">Tải video offline ⬇️</button></a></div><div class="note">Video webm 5s, caption đã ghép. Muốn có overlay ninja + 720p/1080p thì dùng bản online VPS.</div>`;
+    status.innerText='Xong offline!';
+  };
+  // start recording
+  v.currentTime=start; await new Promise(r=>{ v.onseeked=r; });
+  recorder.start();
+  v.play();
+  let startTime=performance.now();
+  function drawLoop(){
+    if(v.currentTime >= start+dur || v.ended || (performance.now()-startTime)/1000 >= dur+0.5){
+      v.pause(); recorder.stop(); return;
+    }
+    // draw video scaled crop 9:16
+    let vw=v.videoWidth, vh=v.videoHeight;
+    if(vw&&vh){
+      // cover 1080x1920
+      let scale=Math.max(1080/vw, 1920/vh);
+      let w=vw*scale, h=vh*scale;
+      let x=(1080-w)/2, y=(1920-h)/2;
+      ctx.drawImage(v,x,y,w,h);
+    } else {
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,1080,1920);
+    }
+    // draw caption
+    let segs=parseCaption(cap); let words=[]; segs.forEach(s=>s.text.split(' ').forEach(w=>{ if(w) words.push({text:w,color:s.color}); }));
+    let lines=[]; let cur=[]; let curW=0; ctx.font='bold 44px sans-serif';
+    words.forEach(w=>{ let wW=ctx.measureText(w.text+' ').width; if(curW+wW>800&&cur.length>0){ lines.push(cur); cur=[w]; curW=wW; } else { cur.push(w); curW+=wW; } });
+    if(cur.length) lines.push(cur);
+    let baseY=1920-350;
+    lines.slice(-5).forEach((line,idx)=>{
+      let lineY=baseY - (lines.length-1-idx)*70;
+      let x=140;
+      line.forEach(w=>{
+        ctx.font=w.color==='red'?'bold 48px sans-serif':'bold 44px sans-serif';
+        ctx.strokeStyle='#fff'; ctx.lineWidth=8; ctx.strokeText(w.text, x, lineY);
+        ctx.fillStyle=w.color==='red'?'#ff3344':'#e8e8ea'; ctx.fillText(w.text, x, lineY);
+        x+=ctx.measureText(w.text).width+18;
+      });
+    });
+    requestAnimationFrame(drawLoop);
+  }
+  drawLoop();
+}
+
+// modal
+function openAddModal(){ document.getElementById('addModal').classList.add('show'); ['modalLink','modalCaption','modalRed','modalWow','modalNote'].forEach(id=>document.getElementById(id).value=''); document.getElementById('addStatus').innerText=''; }
+function closeAddModal(){ document.getElementById('addModal').classList.remove('show'); }
+function submitAdd(){
+  let link=document.getElementById('modalLink').value.trim(); if(!link) return alert('Nhập link');
+  let caption=document.getElementById('modalCaption').value.trim();
+  let red=document.getElementById('modalRed').value.trim();
+  let wow=parseFloat(document.getElementById('modalWow').value); if(isNaN(wow)) wow=0;
+  let note=document.getElementById('modalNote').value.trim();
+  let finalCap=caption; if(red){ if(finalCap&&finalCap.includes(red)&&!finalCap.includes(`[${red}]`)) finalCap=finalCap.replace(red,`[${red}]`); else if(finalCap&&!finalCap.includes(`[${red}]`)) finalCap=`${finalCap} [${red}]`; else if(!finalCap) finalCap=`[${red}]`; }
+  let item={id:uid(),link,title:finalCap||link,caption:finalCap,red_text:red,red:red,wow_start:wow,note,notes:note,done:false,created_at:new Date().toISOString()};
+  links.unshift(item); saveLinks(); closeAddModal(); renderList(); selectLink(item.id);
+}
+document.querySelectorAll('.tabs button').forEach(b=>{ b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); filter=b.dataset.filter; renderList(); }; });
+document.getElementById('search').addEventListener('input',e=>{ q=e.target.value; renderList(); });
+document.getElementById('btnAdd').onclick=openAddModal;
+document.getElementById('btnCloseModal').onclick=closeAddModal;
+document.getElementById('btnCancelAdd').onclick=closeAddModal;
+document.getElementById('btnSubmitAdd').onclick=submitAdd;
+document.getElementById('addModal').addEventListener('click',e=>{ if(e.target.id==='addModal') closeAddModal(); });
+document.getElementById('btnExport').onclick=()=>{ let blob=new Blob([JSON.stringify(links,null,2)],{type:'application/json'}); let url=URL.createObjectURL(blob); let a=document.createElement('a'); a.href=url; a.download=`kho-offline-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); };
+document.getElementById('btnImport').onclick=()=>document.getElementById('importFile').click();
+document.getElementById('importFile').onchange=e=>{ let f=e.target.files[0]; if(!f) return; let r=new FileReader(); r.onload=ev=>{ try{ let data=JSON.parse(ev.target.result); if(Array.isArray(data)){ links=data; saveLinks(); renderList(); alert(`Nhập ${data.length} link`);} }catch(err){ alert(err.message);} }; r.readAsText(f); };
+loadLinks(); renderList();
+</script>
+</body>
+</html>

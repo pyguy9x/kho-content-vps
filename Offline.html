@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Kho Content - OFFLINE Single File</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:ui-sans,system-ui,-apple-system,Segoe UI,Roboto; background:#0e0e10;color:#e8e8ea;display:flex;height:100vh;overflow:hidden}
+button{cursor:pointer;border:1px solid #2a2a2e;background:#1e1e22;color:#e8e8ea;padding:8px 14px;border-radius:8px;font-size:13px;transition:.15s}
+button:hover{background:#26262c;border-color:#3a3a40}
+button.primary{background:#fff;color:#0e0e10;border-color:#fff;font-weight:700}
+button.primary:hover{background:#e8e8e8}
+button.ghost{background:transparent;border-color:#2a2a2e}
+button.danger{border-color:#4a1a1a;background:#2a1515;color:#ff6b6b}
+button.danger:hover{background:#3a1a1a;border-color:#6a2a2a}
+button.small{padding:5px 10px;font-size:11px}
+button:disabled{opacity:.35;cursor:not-allowed}
+input,textarea{border:1px solid #2a2a2e;background:#16161a;color:#e8e8ea;border-radius:8px;padding:9px 11px;width:100%;font-size:13px}
+input:focus,textarea:focus{outline:none;border-color:#4a4a52;background:#1c1c20}
+.sidebar{width:380px;border-right:1px solid #1e1e22;display:flex;flex-direction:column;background:#121214}
+.header{padding:14px 16px;border-bottom:1px solid #1e1e22;display:flex;justify-content:space-between;align-items:center}
+.tabs{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid #1e1e22}
+.tabs button{flex:1;padding:6px;font-size:12px;background:#1a1a1e;border-color:#2a2a2e}
+.tabs button.active{background:#fff;color:#0e0e10;border-color:#fff}
+.list{flex:1;overflow:auto}
+.item{padding:11px 12px;border-bottom:1px solid #1a1a1e;cursor:pointer;display:flex;gap:10px;transition:.12s}
+.item:hover{background:#1a1a1e}
+.item.selected{background:#1e1e22;color:#fff;border-left:2px solid #fff}
+.item .title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.item .meta{font-size:11px;color:#7a7a84;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tick{width:20px;height:20px;border:1px solid #3a3a44;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;background:#16161a;color:#5a5a66}
+.item.done .tick{background:#fff;color:#0e0e10;border-color:#fff}
+.item.selected .tick{border-color:#fff;color:#fff}
+.main{flex:1;overflow:auto;padding:20px;max-width:980px;background:#0e0e10}
+.card{border:1px solid #1e1e22;border-radius:12px;padding:16px;margin-bottom:16px;background:#151519}
+.label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#7a7a84;margin-bottom:10px;display:block;font-weight:700}
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.thumb{aspect-ratio:9/16;background:#0a0a0c;border-radius:8px;position:relative;overflow:hidden;border:2px solid #1e1e22;cursor:pointer;transition:.15s}
+.thumb:hover{border-color:#3a3a40}
+.thumb.selected{border-color:#fff;box-shadow:0 0 0 1px #fff}
+.thumb img, .thumb canvas{width:100%;height:100%;object-fit:cover}
+.thumb .lb{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.75);color:#e8e8ea;font-size:10px;padding:5px 6px;backdrop-filter:blur(4px)}
+.preview-caption{border:1px dashed #2a2a2e;background:#101012;padding:12px;border-radius:8px;min-height:60px}
+.preview-caption .black{color:#e8e8ea;font-weight:700}
+.preview-caption .red{color:#ff3344;font-weight:800}
+.video-row{display:flex;gap:16px;flex-wrap:wrap}
+.video-box{flex:1;min-width:280px}
+.video-box video{width:100%;max-width:360px;border-radius:12px;background:#000;border:1px solid #1e1e22}
+.badge{font-size:10px;border:1px solid #2a2a2e;border-radius:999px;padding:3px 9px;color:#9a9aa4}
+.badge.done{background:#fff;color:#0e0e10;border-color:#fff}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:8px}
+.note{font-size:11px;color:#7a7a84}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field-label{font-size:11px;color:#9a9aa4;font-weight:600;display:flex;justify-content:space-between}
+.field-row{display:flex;gap:8px;align-items:center}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal-overlay.show{display:flex}
+.modal{background:#151519;border:1px solid #2a2a2e;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow:auto;padding:20px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-title{font-size:16px;font-weight:700}
+.offline-badge{background:#ffcc00;color:#000;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;margin-left:8px}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="header">
+    <div><b>KHO LINK</b> <span class="offline-badge">OFFLINE</span> <span id="count" style="font-size:12px;opacity:.6"></span></div>
+    <button id="btnAdd">+ Thêm link</button>
+  </div>
+  <div style="padding:8px 12px;display:flex;gap:6px">
+    <input id="search" placeholder="Tìm link, title, ghi chú, red text..." style="flex:1"/>
+    <button class="small ghost" id="btnExport" title="Xuất JSON">⬇️</button>
+    <button class="small ghost" id="btnImport" title="Nhập JSON">⬆️</button>
+    <input type="file" id="importFile" accept=".json" style="display:none"/>
+  </div>
+  <div class="tabs">
+    <button data-filter="all" class="active">Tất cả</button>
+    <button data-filter="pending">Chưa làm</button>
+    <button data-filter="done">Đã xong ✓</button>
+  </div>
+  <div class="list" id="list"></div>
+</div>
+<div class="main" id="main">
+  <div style="opacity:.5;padding:40px">Chọn 1 link bên trái để bắt đầu<br><span style="font-size:12px">Bản offline lưu trong trình duyệt (localStorage), không cần internet, 1 file duy nhất.</span></div>
+</div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">+ Thêm link mới (Offline)</div>
+      <button class="small ghost" id="btnCloseModal">✕</button>
+    </div>
+    <div class="col">
+      <div class="field"><div class="field-label"><span>Link cần thêm *</span></div><input id="modalLink" placeholder="https://www.facebook.com/reel/..."/></div>
+      <div class="field"><div class="field-label"><span>Caption (vd: Màn trình diễn nhìn thì vui nhưng khúc này hơi thót tim)</span></div><textarea id="modalCaption" rows="2" placeholder="Nhập caption gốc..."></textarea></div>
+      <div class="field"><div class="field-label"><span>Red text - chữ muốn làm đỏ</span><span class="note">sẽ tự chèn thành [đỏ]</span></div><input id="modalRed" placeholder="VD: hơi thót tim, không tốt, cháy túi..."/></div>
+      <div class="field"><div class="field-label"><span>Wow moment - giây bắt đầu (duration cố định 5s)</span></div><div class="field-row"><input id="modalWow" type="number" step="0.1" placeholder="VD: 7.8" style="max-width:140px"/><span class="note">giây, vd 7.8 = lấy 7.8s -> 12.8s</span></div></div>
+      <div class="field"><div class="field-label"><span>Ghi chú</span></div><textarea id="modalNote" rows="2" placeholder="VD: khách dặn cắt đoạn 0:05-0:10..."></textarea></div>
+      <div class="row" style="margin-top:8px"><button id="btnSubmitAdd" class="primary">Thêm vào kho</button><button id="btnCancelAdd" class="ghost">Hủy</button><span class="note" id="addStatus"></span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY='kho_offline_links_v4';
+let links=[], filter='all', q='', selected=null, thumbs=[], selectedThumb=null, rawFile=null, customThumbs=[], uploadedVideoUrl=null;
+
+function loadLinks(){
+  try{
+    let data=localStorage.getItem(STORAGE_KEY);
+    if(data){ links=JSON.parse(data); }
+    else{
+      // seed demo
+      links=[{
+        id:'demo1',link:'https://www.facebook.com/reel/1581865910246993',
+        title:'Màn trình diễn nhìn thì vui',caption:'Màn trình diễn nhìn thì vui [nhưng khúc này hơi thót tim] xem lại vẫn nổi da gà',
+        red_text:'nhưng khúc này hơi thót tim',red:'nhưng khúc này hơi thót tim',wow_start:7.8,
+        note:'Demo offline - sửa được hết',done:false,created_at:new Date().toISOString()
+      }];
+      saveLinks();
+    }
+  }catch(e){ links=[]; }
+}
+function saveLinks(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(links)); }
+
+function parseCaption(text){
+  if(!text) return []
+  let m=text.match(/\[(.+?)\]|\{(.+?)}|\<(.+?)\>|\*\*(.+?)\*\*/)
+  if(m){
+    let red=m.slice(1).find(Boolean)
+    if(red){
+      let before=text.slice(0,m.index).trim().replace(/^[;:|,]+|[;:|,]+$/g,'')
+      let after=text.slice(m.index+m[0].length).trim().replace(/^[;:|,]+|[;:|,]+$/g,'')
+      let segs=[]
+      if(before) segs.push({text:before,color:'black'})
+      segs.push({text:red.trim(),color:'red'})
+      if(after) segs.push({text:after,color:'black'})
+      return segs
+    }
+  }
+  let parts=text.split(';;').map(s=>s.trim()).filter(Boolean)
+  if(parts.length===0) return []
+  if(parts.length===1) return [{text:parts[0],color:'black'}]
+  let segs=[]
+  if(parts[0]) segs.push({text:parts[0],color:'black'})
+  if(parts[1]) segs.push({text:parts[1],color:'red'})
+  if(parts[2]) segs.push({text:parts.slice(2).join(' '),color:'black'})
+  return segs
+}
+
+function renderList(){
+  let el=document.getElementById('list'); el.innerHTML=''
+  let filtered=links.filter(l=>{
+    if(filter==='pending' && l.done) return false
+    if(filter==='done' && !l.done) return false
+    if(q){
+      let hay=(l.link+' '+(l.title||'')+' '+(l.caption||'')+' '+(l.note||'')+' '+(l.red_text||l.red||'')).toLowerCase()
+      if(!hay.includes(q.toLowerCase())) return false
+    }
+    return true
+  })
+  document.getElementById('count').innerText=filtered.length
+  filtered.forEach(l=>{
+    let div=document.createElement('div')
+    div.className='item'+(l.done?' done':'')+(selected&&selected.id===l.id?' selected':'')
+    div.innerHTML=`
+      <div class="tick">${l.done?'✓':''}</div>
+      <div style="flex:1;min-width:0">
+        <div class="title">${escapeHtml(l.title||l.caption||l.link)}</div>
+        <div class="meta">${escapeHtml(l.link)}</div>
+        <div class="meta">${l.wow_start!=null?`⏱ ${l.wow_start}s | `:''}${l.red_text||l.red?`🔴 ${escapeHtml(l.red_text||l.red)} | `:''}${escapeHtml((l.caption||'').slice(0,60))}</div>
+        ${l.note?`<div class="meta" style="color:#ff9">📝 ${escapeHtml(l.note.slice(0,40))}</div>`:''}
+      </div>`
+    div.onclick=()=>selectLink(l.id)
+    el.appendChild(div)
+  })
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])) }
+function selectLink(id){ selected=links.find(x=>x.id===id); if(!selected) return; thumbs=[]; selectedThumb=null; customThumbs=[]; rawFile=null; uploadedVideoUrl=null; renderDetail(); renderList(); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+function renderDetail(){
+  if(!selected) return
+  let main=document.getElementById('main')
+  main.innerHTML=`
+    <div class="card">
+      <span class="label">Link info - offline, sửa từng trường, tự lưu localStorage</span>
+      <div class="col">
+        <div class="row"><span class="badge ${selected.done?'done':''}">${selected.done?'Đã xong ✓':'Chưa làm'}</span><span class="note">${new Date(selected.created_at).toLocaleString()}</span><span class="note">ID: ${selected.id}</span></div>
+        
+        <div class="field"><div class="field-label"><span>Link gốc (sửa được)</span><span class="note" id="linkStatus"></span></div><div class="field-row"><input id="linkUrl" value="${escapeHtml(selected.link)}"/><button class="small primary" id="btnSaveLink">Lưu link</button><button class="small ghost" onclick="navigator.clipboard.writeText('${escapeHtml(selected.link).replace(/'/g, "\'")}')">Copy</button></div></div>
+
+        <div class="field"><div class="field-label"><span>Tiêu đề</span><span class="note" id="titleStatus"></span></div><div class="field-row"><input id="titleInput" value="${escapeHtml(selected.title||'')}"/><button class="small primary" id="btnSaveTitle">Lưu tiêu đề</button></div></div>
+
+        <div class="field"><div class="field-label"><span>Caption (có thể chứa [đỏ])</span><span class="note" id="captionFieldStatus"></span></div><textarea id="captionFieldInput" rows="2">${escapeHtml(selected.caption||'')}</textarea><div class="field-row" style="margin-top:6px"><button class="small primary" id="btnSaveCaptionField">Lưu caption</button><button class="small ghost" id="btnBuildCaptionFromRed">Tạo caption từ red</button></div></div>
+
+        <div class="field"><div class="field-label"><span>Red text - chữ muốn làm đỏ</span><span class="note" id="redStatus"></span></div><div class="field-row"><input id="redInput" value="${escapeHtml(selected.red_text||selected.red||'')}"/><button class="small primary" id="btnSaveRed">Lưu red</button><button class="small ghost" id="btnApplyRedToCaption">Chèn vào caption</button></div></div>
+
+        <div class="field"><div class="field-label"><span>Wow moment - giây bắt đầu (duration 5s cố định)</span><span class="note" id="wowStatus"></span></div><div class="field-row"><input id="wowStartField" type="number" step="0.1" value="${selected.wow_start!=null?selected.wow_start:''}" style="max-width:140px"/><button class="small primary" id="btnSaveWow">Lưu wow</button><span class="note">vd 7.8 = 7.8s -> 12.8s</span></div></div>
+
+        <div class="field"><div class="field-label"><span>Ghi chú</span><span class="note" id="noteStatus"></span></div><textarea id="noteInput" rows="2">${escapeHtml(selected.note||'')}</textarea><div class="field-row" style="margin-top:6px"><button class="small primary" id="btnSaveNote">Lưu ghi chú</button></div></div>
+
+        <div class="row" style="margin-top:12px">
+          <button id="btnToggleDone" class="${selected.done?'ghost':'primary'}">${selected.done?'↩️ Chưa xong':'✅ Đã xong'}</button>
+          <button id="btnDeleteLink" class="small danger">🗑️ Xóa link</button>
+          <button id="btnDuplicate" class="small ghost">📋 Nhân bản</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="label">Video local preview - offline (không cần tải link)</span>
+      <div class="video-row">
+        <div class="video-box">
+          <input type="file" id="videoFile" accept="video/*" style="margin-bottom:8px"/>
+          <video id="rawVideo" controls playsinline style="display:none"></video>
+          <canvas id="previewCanvas" style="display:none"></canvas>
+          <div class="row" style="margin-top:8px">
+            <span class="note" id="rawTime">Chưa chọn video</span>
+            <button class="small" id="btnCaptureTime">⏱ Lấy tại giây hiện tại</button>
+            <button class="small primary" id="btnGenThumbs">📸 Tạo 4 thumb từ video</button>
+          </div>
+        </div>
+        <div class="video-box col">
+          <div class="row"><div style="flex:1"><div class="note">Wow start</div><input id="wowStart" type="number" step="0.1" value="${selected.wow_start||0}"/></div><div style="flex:1"><div class="note">Duration</div><input value="5.0" readonly style="opacity:.6"/></div></div>
+          <div class="note">Offline: chọn file video từ máy, bấm tạo thumb, thumb sẽ cắt bằng canvas (không cần ffmpeg). Wow moment lưu lại để sau này render trên VPS.</div>
+          <div id="customThumbPreview" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="label">Thumb preview - offline canvas</span>
+      <div class="thumbs" id="thumbsBox"><div style="opacity:.4;font-size:12px">Chọn file video rồi bấm "Tạo 4 thumb từ video". Hoặc bấm "Lấy tại giây hiện tại" để tạo thumb custom.</div></div>
+    </div>
+
+    <div class="card">
+      <span class="label">Caption editor - [red] live preview offline</span>
+      <textarea id="capInput" rows="3">${escapeHtml(selected.caption||'')}</textarea>
+      <div style="height:8px"></div>
+      <div class="preview-caption" id="capPreview"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnPreview">Preview text</button>
+        <button id="btnPreviewOverlay" class="primary">👁️ Xem trước overlay + caption (canvas)</button>
+        <span class="note">Hỗ trợ [đỏ], {đỏ}, <đỏ>, **đỏ** hoặc ;; </span>
+      </div>
+      <div id="overlayPreviewBox" style="display:none;margin-top:12px;border:1px solid #1e1e22;border-radius:12px;padding:12px;background:#0e0e10">
+        <span class="label">Preview canvas - caption trên thumb/wow (offline)</span>
+        <div class="row" style="align-items:flex-start">
+          <canvas id="overlayPreviewCanvas" width="540" height="960" style="width:270px;height:480px;border-radius:12px;border:1px solid #2a2a2e;background:#000"></canvas>
+          <div class="col" style="flex:1">
+            <div class="note" id="overlayPreviewStatus">Chưa có preview</div>
+            <div class="note" style="margin-top:8px">Bản offline vẽ bằng canvas: nền là frame tại wow start (hoặc thumb) + caption đen đỏ. Không cần overlay PNG, xem trước để duyệt caption.</div>
+            <div class="row" style="margin-top:12px"><button class="small" id="btnDownloadPreview">⬇️ Tải ảnh preview</button><button class="small ghost" id="btnClosePreview">Đóng</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('btnSaveLink').onclick=saveLink
+  document.getElementById('btnSaveTitle').onclick=saveTitle
+  document.getElementById('btnSaveNote').onclick=saveNote
+  document.getElementById('btnSaveWow').onclick=saveWow
+  document.getElementById('btnSaveRed').onclick=saveRed
+  document.getElementById('btnSaveCaptionField').onclick=saveCaptionField
+  document.getElementById('btnBuildCaptionFromRed').onclick=buildCaptionFromRed
+  document.getElementById('btnApplyRedToCaption').onclick=applyRedToCaption
+  document.getElementById('btnToggleDone').onclick=toggleDone
+  document.getElementById('btnDeleteLink').onclick=deleteLink
+  document.getElementById('btnDuplicate').onclick=duplicateLink
+  document.getElementById('btnPreview').onclick=updatePreview
+  document.getElementById('btnPreviewOverlay').onclick=previewOverlayCaption
+  document.getElementById('btnClosePreview').onclick=()=>{ document.getElementById('overlayPreviewBox').style.display='none' }
+  document.getElementById('btnDownloadPreview').onclick=downloadPreview
+  document.getElementById('videoFile').onchange=handleVideoFile
+  document.getElementById('btnCaptureTime').onclick=captureCurrentTime
+  document.getElementById('btnGenThumbs').onclick=genThumbsOffline
+  document.getElementById('capInput').addEventListener('input',updatePreview)
+  document.getElementById('captionFieldInput').addEventListener('input',()=>{ document.getElementById('capInput').value=document.getElementById('captionFieldInput').value; updatePreview() })
+  document.getElementById('wowStartField').addEventListener('input',e=>{ document.getElementById('wowStart').value=e.target.value })
+  document.getElementById('wowStart').addEventListener('input',e=>{ document.getElementById('wowStartField').value=e.target.value; if(selectedThumb) selectedThumb.start=parseFloat(e.target.value)||0 })
+  updatePreview()
+}
+
+function saveField(updates, statusId, successMsg){
+  let idx=links.findIndex(x=>x.id===selected.id)
+  if(idx<0) return
+  Object.assign(links[idx], updates)
+  Object.assign(selected, updates)
+  saveLinks()
+  let st=document.getElementById(statusId)
+  if(st){ st.innerText=successMsg||'Đã lưu ✓'; setTimeout(()=>st.innerText='',2000) }
+  renderList()
+}
+function saveLink(){ let v=document.getElementById('linkUrl').value.trim(); if(!v) return alert('Link trống'); saveField({link:v}, 'linkStatus') }
+function saveTitle(){ let v=document.getElementById('titleInput').value; saveField({title:v}, 'titleStatus') }
+function saveNote(){ let v=document.getElementById('noteInput').value; saveField({note:v, notes:v}, 'noteStatus') }
+function saveWow(){ let v=parseFloat(document.getElementById('wowStartField').value); if(isNaN(v)) return alert('Nhập số'); saveField({wow_start:v}, 'wowStatus') }
+function saveRed(){ let v=document.getElementById('redInput').value.trim(); saveField({red_text:v, red:v}, 'redStatus') }
+function saveCaptionField(){ let v=document.getElementById('captionFieldInput').value; saveField({caption:v}, 'captionFieldStatus'); document.getElementById('capInput').value=v; updatePreview() }
+function buildCaptionFromRed(){
+  let cap=document.getElementById('captionFieldInput').value.trim()
+  let red=document.getElementById('redInput').value.trim()
+  if(!red) return alert('Nhập red text trước')
+  if(!cap) cap=red
+  if(cap.includes(red) && !cap.includes(`[${red}]`)) cap=cap.replace(red, `[${red}]`)
+  else if(!cap.includes(`[${red}]`)) cap=`${cap} [${red}]`
+  document.getElementById('captionFieldInput').value=cap; document.getElementById('capInput').value=cap; updatePreview()
+}
+function applyRedToCaption(){
+  let cap=document.getElementById('capInput').value
+  let red=document.getElementById('redInput').value.trim()
+  if(!red) return alert('Nhập red text')
+  if(!cap) cap=red
+  if(cap.includes(red) && !cap.includes(`[${red}]`)) cap=cap.replace(red, `[${red}]`)
+  else if(!cap.includes(`[${red}]`)) cap=`${cap} [${red}]`
+  document.getElementById('capInput').value=cap; document.getElementById('captionFieldInput').value=cap; updatePreview()
+}
+function toggleDone(){ saveField({done:!selected.done}); renderDetail(); }
+function deleteLink(){
+  if(!confirm(`Xóa link này?\n${selected.link}\nKhông khôi phục được!`)) return
+  links=links.filter(x=>x.id!==selected.id); selected=null; saveLinks()
+  document.getElementById('main').innerHTML='<div style="opacity:.5;padding:40px">Đã xóa. Chọn link khác.</div>'; renderList()
+}
+function duplicateLink(){
+  let newItem={...selected, id:uid(), created_at:new Date().toISOString(), done:false}
+  links.unshift(newItem); saveLinks(); selectLink(newItem.id)
+}
+function updatePreview(){
+  let txt=document.getElementById('capInput')?.value||''
+  let segs=parseCaption(txt)
+  let p=document.getElementById('capPreview')
+  if(!p) return
+  if(segs.length===0){p.innerHTML='<span style="opacity:.4">Chưa có caption - nhớ [đỏ]</span>'; return}
+  p.innerHTML=segs.map(s=>`<span class="${s.color}">${escapeHtml(s.text)} </span>`).join('')
+}
+
+// Video offline handling
+function handleVideoFile(e){
+  let file=e.target.files[0]
+  if(!file) return
+  rawFile=file
+  if(uploadedVideoUrl) URL.revokeObjectURL(uploadedVideoUrl)
+  uploadedVideoUrl=URL.createObjectURL(file)
+  let v=document.getElementById('rawVideo')
+  v.style.display='block'
+  v.src=uploadedVideoUrl
+  v.load()
+  v.onloadedmetadata=()=>{
+    document.getElementById('rawTime').innerText=`${v.duration.toFixed(1)}s - sẵn sàng tạo thumb`
+    let suggested=Math.max(0, v.duration-5.3)
+    document.getElementById('wowStart').value=suggested.toFixed(1)
+    document.getElementById('wowStartField').value=suggested.toFixed(1)
+  }
+  v.ontimeupdate=()=>{ document.getElementById('rawTime').innerText=`${v.currentTime.toFixed(1)}s / ${v.duration.toFixed(1)}s` }
+}
+function captureCurrentTime(){
+  let v=document.getElementById('rawVideo')
+  if(!v || isNaN(v.currentTime)) return alert('Chưa có video')
+  let cur=v.currentTime
+  document.getElementById('wowStart').value=cur.toFixed(1)
+  document.getElementById('wowStartField').value=cur.toFixed(1)
+  // create custom thumb from current frame
+  createThumbFromVideo(cur, `Custom: ${cur.toFixed(1)}s`)
+}
+function genThumbsOffline(){
+  let v=document.getElementById('rawVideo')
+  if(!v || !v.duration) return alert('Chọn file video trước')
+  let dur=v.duration
+  let times=[
+    {t:Math.max(0, dur-5), label:`Opt1: 5s cuối (${(dur-5).toFixed(1)}s)`},
+    {t:dur*0.3, label:`Opt2: Giữa (${(dur*0.3).toFixed(1)}s)`},
+    {t:dur*0.7, label:`Opt3: Gần cuối (${(dur*0.7).toFixed(1)}s)`},
+    {t:dur*0.8, label:`Opt4: 80% (${(dur*0.8).toFixed(1)}s)`},
+  ]
+  thumbs=[]
+  customThumbs=[]
+  let canvas=document.getElementById('previewCanvas')
+  let ctx=canvas.getContext('2d')
+  canvas.width=540; canvas.height=960
+  let i=0
+  function captureNext(){
+    if(i>=times.length){ renderThumbs(); return }
+    let item=times[i]
+    v.currentTime=item.t
+    setTimeout(()=>{
+      canvas.width=v.videoWidth||540; canvas.height=v.videoHeight||960
+      ctx.drawImage(v,0,0,canvas.width,canvas.height)
+      let dataUrl=canvas.toDataURL('image/jpeg',0.8)
+      thumbs.push({url:dataUrl, start:item.t, dur:5, label:item.label, path:`thumb_${i}.jpg`})
+      i++; captureNext()
+    },300)
+  }
+  captureNext()
+}
+function createThumbFromVideo(time, label){
+  let v=document.getElementById('rawVideo')
+  let canvas=document.getElementById('previewCanvas')
+  let ctx=canvas.getContext('2d')
+  let prevTime=v.currentTime
+  v.currentTime=time
+  setTimeout(()=>{
+    canvas.width=v.videoWidth||540; canvas.height=v.videoHeight||960
+    ctx.drawImage(v,0,0,canvas.width,canvas.height)
+    let dataUrl=canvas.toDataURL('image/jpeg',0.8)
+    let t={url:dataUrl, start:time, dur:5, label:label, path:`custom_${Date.now()}.jpg`}
+    customThumbs.push(t); selectedThumb=t; renderThumbs()
+    document.getElementById('customThumbPreview').innerHTML=`<div class="note">Custom thumb mới:</div><img src="${dataUrl}" style="width:120px;border-radius:8px;border:2px solid #fff;margin-top:6px"/>`
+    v.currentTime=prevTime
+  },200)
+}
+function renderThumbs(){
+  let box=document.getElementById('thumbsBox'); box.innerHTML=''
+  let all=[...thumbs, ...customThumbs]
+  if(all.length===0){ box.innerHTML='<div style="opacity:.4;font-size:12px">Chưa có thumb</div>'; return }
+  all.forEach((t,i)=>{
+    let div=document.createElement('div'); div.className='thumb'+(selectedThumb&&selectedThumb.url===t.url?' selected':'')
+    if(i===0 && !selectedThumb){ selectedThumb=t; div.classList.add('selected') }
+    div.innerHTML=`<img src="${t.url}"/><div class="lb">${escapeHtml(t.label)}</div>`
+    div.onclick=()=>{
+      selectedThumb=t
+      document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('selected'))
+      div.classList.add('selected')
+      let ws=document.getElementById('wowStart'); if(ws) ws.value=t.start.toFixed(1)
+      let wf=document.getElementById('wowStartField'); if(wf) wf.value=t.start.toFixed(1)
+    }
+    box.appendChild(div)
+  })
+}
+function previewOverlayCaption(){
+  let capTxt=document.getElementById('capInput')?.value||''
+  if(!capTxt){ alert('Nhập caption trước'); return }
+  let start=parseFloat(document.getElementById('wowStart')?.value)||selected?.wow_start||0
+  let box=document.getElementById('overlayPreviewBox')
+  let canvas=document.getElementById('overlayPreviewCanvas')
+  let status=document.getElementById('overlayPreviewStatus')
+  box.style.display='block'
+  status.innerText=`Đang vẽ preview tại ${start.toFixed(1)}s...`
+  let ctx=canvas.getContext('2d')
+  canvas.width=1080; canvas.height=1920
+  // background: selected thumb or black
+  ctx.fillStyle='#0e0e10'; ctx.fillRect(0,0,1080,1920)
+  let drawBg=()=>{
+    // draw caption
+    let segs=parseCaption(capTxt)
+    let words=[]; segs.forEach(s=>{ s.text.split(' ').forEach(w=>{ if(w) words.push({text:w,color:s.color}) }) })
+    // simple layout: center bottom
+    ctx.textAlign='center'
+    let y=1920-300
+    let line=''
+    let lines=[]
+    let current=[]
+    let maxW=800
+    ctx.font='bold 44px sans-serif'
+    let lineW=0
+    words.forEach(w=>{
+      let wWidth=ctx.measureText(w.text+' ').width
+      if(lineW + wWidth > maxW && current.length>0){ lines.push(current); current=[w]; lineW=wWidth } else { current.push(w); lineW+=wWidth }
+    })
+    if(current.length) lines.push(current)
+    // draw lines bottom up
+    lines.slice(-5).forEach((lineWords, idx)=>{
+      let lineY=y - (lines.length-1-idx)*70
+      let totalText=lineWords.map(w=>w.text).join(' ')
+      let totalW=ctx.measureText(totalText).width + (lineWords.length-1)*20
+      let x=1080/2+70
+      lineWords.forEach(w=>{
+        ctx.font = w.color==='red' ? 'bold 48px sans-serif' : 'bold 44px sans-serif'
+        ctx.fillStyle = w.color==='red' ? '#ff3344' : '#e8e8ea'
+        ctx.strokeStyle='#fff'; ctx.lineWidth=8
+        ctx.strokeText(w.text, x, lineY)
+        ctx.fillText(w.text, x, lineY)
+        x+=ctx.measureText(w.text).width+20
+      })
+    })
+    status.innerText=`Preview xong tại ${start.toFixed(1)}s - canvas offline.`
+  }
+  // if selectedThumb exists, draw it first
+  if(selectedThumb && selectedThumb.url){
+    let img=new Image()
+    img.onload=()=>{
+      ctx.drawImage(img,0,0,1080,1920)
+      // overlay ninja placeholder - semi transparent gradient bottom
+      let grad=ctx.createLinearGradient(0,1200,0,1920)
+      grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,0.6)')
+      ctx.fillStyle=grad; ctx.fillRect(0,1200,1080,720)
+      drawBg()
+    }
+    img.src=selectedThumb.url
+  } else {
+    drawBg()
+  }
+  box.scrollIntoView({behavior:'smooth', block:'nearest'})
+}
+function downloadPreview(){
+  let canvas=document.getElementById('overlayPreviewCanvas')
+  let a=document.createElement('a')
+  a.download=`preview_${Date.now()}.jpg`
+  a.href=canvas.toDataURL('image/jpeg',0.85)
+  a.click()
+}
+
+// Modal
+function openAddModal(){
+  document.getElementById('addModal').classList.add('show')
+  document.getElementById('modalLink').value=''
+  document.getElementById('modalCaption').value=''
+  document.getElementById('modalRed').value=''
+  document.getElementById('modalWow').value=''
+  document.getElementById('modalNote').value=''
+  document.getElementById('addStatus').innerText=''
+}
+function closeAddModal(){ document.getElementById('addModal').classList.remove('show') }
+function submitAdd(){
+  let link=document.getElementById('modalLink').value.trim()
+  if(!link){ alert('Nhập link'); return }
+  let caption=document.getElementById('modalCaption').value.trim()
+  let red=document.getElementById('modalRed').value.trim()
+  let wowVal=document.getElementById('modalWow').value
+  let wow= wowVal?parseFloat(wowVal):null
+  let note=document.getElementById('modalNote').value.trim()
+  // build final caption with red
+  let finalCap=caption
+  if(red){
+    if(finalCap && finalCap.includes(red) && !finalCap.includes(`[${red}]`)) finalCap=finalCap.replace(red, `[${red}]`)
+    else if(finalCap && !finalCap.includes(`[${red}]`)) finalCap=`${finalCap} [${red}]`
+    else if(!finalCap) finalCap=`[${red}]`
+  }
+  let newItem={
+    id:uid(),
+    link:link,
+    title:finalCap||link,
+    caption:finalCap,
+    red_text:red,
+    red:red,
+    wow_start: wow!=null && !isNaN(wow) ? wow : 0,
+    note:note,
+    notes:note,
+    done:false,
+    created_at:new Date().toISOString()
+  }
+  links.unshift(newItem); saveLinks(); closeAddModal(); renderList(); selectLink(newItem.id)
+}
+
+// Export/Import
+document.getElementById('btnExport').onclick=()=>{
+  let dataStr=JSON.stringify(links,null,2)
+  let blob=new Blob([dataStr],{type:'application/json'})
+  let url=URL.createObjectURL(blob)
+  let a=document.createElement('a'); a.href=url; a.download=`kho-links-offline-${new Date().toISOString().slice(0,10)}.json`; a.click()
+  URL.revokeObjectURL(url)
+}
+document.getElementById('btnImport').onclick=()=>document.getElementById('importFile').click()
+document.getElementById('importFile').onchange=(e)=>{
+  let file=e.target.files[0]; if(!file) return
+  let reader=new FileReader()
+  reader.onload=(ev)=>{
+    try{
+      let data=JSON.parse(ev.target.result)
+      if(Array.isArray(data)){ links=data; saveLinks(); renderList(); alert(`Đã nhập ${data.length} link`) }
+      else alert('File JSON không đúng format')
+    }catch(err){ alert('Lỗi đọc JSON: '+err.message) }
+  }
+  reader.readAsText(file)
+}
+
+document.querySelectorAll('.tabs button').forEach(b=>{
+  b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); filter=b.dataset.filter; renderList() }
+})
+document.getElementById('search').addEventListener('input',e=>{q=e.target.value; renderList()})
+document.getElementById('btnAdd').onclick=openAddModal
+document.getElementById('btnCloseModal').onclick=closeAddModal
+document.getElementById('btnCancelAdd').onclick=closeAddModal
+document.getElementById('btnSubmitAdd').onclick=submitAdd
+document.getElementById('addModal').addEventListener('click',e=>{ if(e.target.id==='addModal') closeAddModal() })
+loadLinks(); renderList();
+</script>
+</body>
+</html>
